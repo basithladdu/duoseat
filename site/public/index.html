@@ -100,8 +100,13 @@
   /* one screen on a desktop, no scrolling */
   @media (min-width: 900px) and (min-height: 600px) { body { height: 100vh; overflow: hidden; } }
   @media (max-width: 899px) {
-    body { grid-template-rows: auto auto auto auto; }
-    .napkin { padding: 4px 10px 0; }
+    body { display: flex; flex-direction: column; min-height: 0; }
+    header { order: 0; } footer { order: 1; } .napkin { order: 2; } main { order: 3; }
+    .napkin { padding: 2px 10px 0; }
+    .napkin svg { height: auto; }
+    footer { border-top: 0; padding: 2px 0 0; justify-content: center; }
+    footer > span { display: none; }
+    .so { justify-content: center; gap: 2px; }
     .wob { filter: none; }
     main { grid-template-columns: 1fr; padding: 8px 18px 18px; }
     header { padding: 12px 18px 2px; }
@@ -132,7 +137,7 @@
 
 <!-- the napkin -->
 <div class="napkin">
-<svg viewBox="0 0 1200 440" role="img" aria-label="Drawing: my laptop with all the files and my mouse; an extra monitor plugged into it is his screen; his laptop, keyboard and mouse send over wi-fi; his orange cursor works on the monitor while my blue cursor works on my laptop. Player C is drawn dashed: not yet.">
+<svg viewBox="0 0 1200 440" role="img" aria-label="Drawing: my laptop with all the files and my mouse; an extra monitor plugged into it is his screen; his laptop, keyboard and mouse send over wi-fi; his orange cursor works on the monitor while my blue cursor works on my laptop.">
   <defs>
     <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
       <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="4"/>
@@ -203,10 +208,6 @@
       <path class="ink thin wifi" d="M872 128 C 760 6, 440 4, 318 104" opacity=".75"/>
       <text class="hand fade" x="566" y="34" font-size="20" style="animation-delay:1.6s;fill:#5a5a6e">wi-fi, ~3 ms</text>
 
-      <!-- player C: not yet -->
-      <rect class="ink thin" x="1104" y="76" width="44" height="80" rx="7" stroke-dasharray="5 5" opacity=".6"/>
-      <text class="hand fade" x="1090" y="178" font-size="18" style="animation-delay:1.7s;fill:#8a8478">player C?</text>
-      <text class="hand fade" x="1098" y="196" font-size="18" style="animation-delay:1.75s;fill:#8a8478">not yet</text>
     </g>
 
     <!-- live bits: windows, typing, cursors (kept crisp, not wobbled) -->
