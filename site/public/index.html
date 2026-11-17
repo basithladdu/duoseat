@@ -44,8 +44,11 @@
   @keyframes on { 50% { box-shadow: 0 0 0 5px #2b9d2b11; } }
 
   /* ---------------- the napkin ---------------- */
-  .napkin { min-height: 0; display: grid; place-items: center; padding: 6px 28px 0; }
-  .napkin svg { width: 100%; height: 100%; max-width: 1180px; max-height: 100%; overflow: visible; }
+  .napkin { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; justify-items: center; padding: 6px 28px 0; }
+  .cap { font: 700 clamp(18px, 2vw, 25px)/1.2 "Caveat", cursive; color: var(--pen); min-height: 1.3em; padding-top: 4px; text-align: center; transition: opacity .25s; }
+  .cap.swap { opacity: 0; }
+  #zones rect { cursor: zoom-in; }
+  .napkin svg { width: 100%; height: 100%; max-width: 1180px; max-height: 100%; overflow: hidden; border-radius: 6px; }
   .hand { font-family: "Caveat", cursive; font-weight: 700; fill: var(--pen); }
   .wob { filter: url(#wobble); }
   .ink { fill: none; stroke: var(--pen); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -95,8 +98,10 @@
   /* Player B, on this page too */
   #b { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; transform: translate(110vw, 40vh); will-change: transform; }
   #b svg { width: 22px; height: 26px; filter: drop-shadow(1px 2px 1px #0003); display: block; }
-  #b span { position: absolute; left: 17px; top: 19px; font: 500 11px "IBM Plex Mono", monospace; color: #fff; background: var(--b); padding: 0 5px; border-radius: 3px; white-space: nowrap; }
+  #b span { position: absolute; left: 4px; top: 27px; font: 500 11px "IBM Plex Mono", monospace; color: #fff; background: var(--b); padding: 0 5px; border-radius: 3px; white-space: nowrap; }
 
+  #me { position: fixed; left: 0; top: 0; z-index: 51; pointer-events: none; font: 500 11px "IBM Plex Mono", monospace; color: #fff; background: var(--a); padding: 0 5px; border-radius: 3px; opacity: 0; transition: opacity .2s; }
+  #me.on { opacity: 1; }
   /* one screen on a desktop, no scrolling */
   @media (min-width: 900px) and (min-height: 600px) { body { height: 100vh; overflow: hidden; } }
   @media (max-width: 899px) {
@@ -113,7 +118,8 @@
     header nav .gh-txt, .status span { display: none; }
     footer { margin: 0 18px; }
     .so span { display: none; }
-    #b span { display: none; }
+    #b span { display: none; } #me { display: none; }
+    .cap { font-size: 17px; }
   }
   @media (prefers-reduced-motion: reduce) { .draw { animation: none; stroke-dashoffset: 0; } .fade { animation: none; opacity: 1; } .wifi { animation: none; } }
 </style>
@@ -184,12 +190,12 @@
       <text class="hand fade" x="430" y="350" font-size="20" style="animation-delay:1.2s;fill:#0078d7">my mouse</text>
 
       <!-- EXTRA MONITOR (his screen) + hdmi -->
-      <path class="ink draw" pathLength="1" d="M494 58 L792 60 L790 248 L496 247 Z" style="animation-delay:.6s"/>
+      <path id="mon" class="ink draw" pathLength="1" d="M494 58 L792 60 L790 248 L496 247 Z" style="animation-delay:.6s"/>
       <path class="ink draw" pathLength="1" d="M643 248 v26 M608 276 h72" style="animation-delay:.9s"/>
       <path class="ink thin draw" pathLength="1" d="M381 252 C 430 254, 470 304, 530 300 S 615 292, 641 276" style="animation-delay:1s"/>
       <text class="hand fade" x="503" y="322" font-size="18" style="animation-delay:1.3s;fill:#5a5a6e">hdmi</text>
-      <text class="hand fade" x="690" y="292" font-size="21" style="animation-delay:1.3s">extra monitor.</text>
-      <text class="hand fade" x="690" y="313" font-size="21" style="animation-delay:1.35s">his screen.</text>
+      <text id="monL1" class="hand fade" x="690" y="292" font-size="21" style="animation-delay:1.3s">extra monitor.</text>
+      <text id="monL2" class="hand fade" x="690" y="313" font-size="21" style="animation-delay:1.35s">his screen.</text>
 
       <!-- HIS LAPTOP + keyboard + mouse (player B) -->
       <path class="ink draw" pathLength="1" d="M862 132 L1052 130 L1050 248 L864 249 Z" style="animation-delay:.7s"/>
@@ -235,11 +241,26 @@
         <text id="tB" x="528" y="116" font-size="16" fill="#7a3d00"></text>
       </g>
 
-      <use id="curA" href="#arrow" fill="#0078d7" stroke="#fff" stroke-width="1.2" transform="translate(250 200)"/>
-      <use id="curB" href="#arrow" fill="#ff8c00" stroke="#fff" stroke-width="1.2" transform="translate(640 160)" opacity="0"/>
+      <g id="curA" transform="translate(250 200)">
+        <use href="#arrow" fill="#0078d7" stroke="#fff" stroke-width="1.2"/>
+        <g transform="translate(-2 22)" font-family="IBM Plex Mono, monospace" font-weight="500"><rect width="27" height="14" rx="3" fill="#0078d7"/><text x="4.5" y="10.5" font-size="10.5" fill="#fff">you</text></g>
+      </g>
+      <g id="curB" transform="translate(640 160)" opacity="0">
+        <use href="#arrow" fill="#ff8c00" stroke="#fff" stroke-width="1.2"/>
+        <g transform="translate(-2 22)" font-family="IBM Plex Mono, monospace" font-weight="500"><rect width="76" height="14" rx="3" fill="#ff8c00"/><text x="4.5" y="10.5" font-size="10.5" fill="#fff">your friend</text></g>
+      </g>
+    </g>
+
+    <!-- hover zones: point at a part, it zooms in and explains just that -->
+    <g id="zones" fill="transparent">
+      <rect data-z="wifi" x="300" y="0" width="600" height="56"/>
+      <rect data-z="A" x="88" y="92" width="398" height="282"/>
+      <rect data-z="mon" x="486" y="56" width="328" height="270"/>
+      <rect data-z="B" x="816" y="96" width="300" height="300"/>
     </g>
   </g>
 </svg>
+  <div class="cap" id="cap" aria-live="polite"></div>
 </div>
 
 <main>
@@ -263,9 +284,10 @@
   </div>
 </footer>
 
+<div id="me" aria-hidden="true">you</div>
 <div id="b" aria-hidden="true">
   <svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.4"/></svg>
-  <span>Player B</span>
+  <span>your friend</span>
 </div>
 
 <script>
@@ -321,25 +343,72 @@
   let off = [0, 0];
   function moveWin(dx, dy) { off = [dx, dy]; winB.setAttribute('transform', `translate(${dx} ${dy})`); }
 
+  /* ---------- the camera: zooms into whatever is being explained ---------- */
+  const svg = document.querySelector('.napkin svg'), cap = $('cap');
+  const VIEW = {                                    // centre x, centre y, width (height follows 1200:440)
+    full: [600, 220, 1200], A: [285, 232, 700], mon: [643, 168, 640], B: [960, 245, 690], wifi: [600, 140, 1000],
+  };
+  const HOVER = {
+    A: 'your laptop. your files, your mouse, your blue cursor.',
+    mon: 'his screen: a real monitor, or a virtual one DuoSeat makes.',
+    B: 'his laptop, his keyboard, his mouse. they drive the orange cursor.',
+    wifi: 'same wi-fi between you. far away? DuoSeat gives him a link.',
+  };
+  let vb = [0, 0, 1200, 440], camRun = 0, hovering = null, step = ['full', ''];
+  function cam(name, text) {
+    const [cx, cy, w] = VIEW[name], h = w * 440 / 1200, to = [cx - w / 2, cy - h / 2, w, h], from = vb.slice(), me = ++camRun, t0 = performance.now();
+    (function f(now) {
+      if (me !== camRun) return;
+      const t = Math.min(1, (now - t0) / 900), e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      vb = from.map((v, i) => v + (to[i] - v) * e); svg.setAttribute('viewBox', vb.join(' '));
+      if (t < 1) requestAnimationFrame(f);
+    })(t0);
+    if (cap.textContent !== text) { cap.classList.add('swap'); setTimeout(() => { cap.textContent = text; cap.classList.remove('swap'); }, 200); }
+  }
+  function show(name, text) { step = [name, text]; if (!hovering) cam(name, text); }
+  // point at a part: zoom there and explain just that part; move away: back to the story
+  document.querySelectorAll('#zones rect').forEach(z => {
+    z.addEventListener('pointerenter', () => { hovering = z.dataset.z; cam(hovering, HOVER[hovering]); });
+    z.addEventListener('pointerleave', e => {
+      if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#zones')) return;
+      if (e.pointerType === 'touch') { setTimeout(() => { hovering = null; cam(step[0], step[1]); }, 3500); return; }
+      hovering = null; cam(step[0], step[1]);
+    });
+  });
+
+  const mon = $('mon');
+  function virtual(on) {
+    mon.style.strokeDasharray = on ? '0.018 0.014' : '';
+    $('monL1').textContent = on ? 'no monitor? fine.' : 'extra monitor.';
+    $('monL2').textContent = on ? 'a virtual one, streamed.' : 'his screen.';
+  }
+
   async function napkin() {
+    show('full', 'how it works');
     await wait(1900);                                   // let the ink dry
     while (true) {
       // reset
-      $('tA').textContent = ''; $('tB').textContent = '';
+      $('tA').textContent = ''; $('tB').textContent = ''; virtual(false);
       $('winA').setAttribute('opacity', 0); winB.setAttribute('opacity', 0); moveWin(0, 0);
       $('inst').setAttribute('opacity', 1); $('instBar').setAttribute('width', 0); $('toast').setAttribute('opacity', 0);
       cur.B.el.setAttribute('opacity', 0);
 
       // 1. install: the second cursor arrives
+      show('A', '1. open DuoSeat on both laptops. yours makes room for a second cursor.');
+      await wait(900);
       for (let w = 0; w <= 158; w += 6) { $('instBar').setAttribute('width', w); await wait(24); }
       await wait(300); $('inst').setAttribute('opacity', 0);
       $('winA').setAttribute('opacity', 1);
 
       // 2. he connects: his window + cursor appear on the monitor
+      show('wifi', '2. he types your PIN. same wi-fi, a few ms.');
+      await wait(700);
       $('toast').setAttribute('opacity', 1); cur.B.el.setAttribute('opacity', 1); winB.setAttribute('opacity', 1);
-      await wait(900); $('toast').setAttribute('opacity', 0);
+      await wait(1500); $('toast').setAttribute('opacity', 0);
 
       // 3. both type, same time, different windows
+      show('full', '3. your keys hit your window. his keys hit his. same time.');
+      await wait(500);
       await Promise.all([
         glide(cur.A, 300, 170, 700).then(() => type($('tA'), ['rent 12k', 'food 6k', 'new mouse: 0'], kA, 55)),
         glide(cur.B, 690, 130, 800).then(() => type($('tB'), ['restarted router', 'still slow', 'blaming you'], kB, 60)),
@@ -347,6 +416,8 @@
       await wait(400);
 
       // 4. he drags his window around the monitor; you keep going
+      show('mon', '4. he drags his window around. you don\'t even notice.');
+      await wait(600);
       await glide(cur.B, 600, 89, 600);
       const t0 = performance.now(), dx = 40, dy = 34;
       await Promise.all([
@@ -356,9 +427,22 @@
         glide(cur.A, 330, 220, 900),
       ]);
       await glide(cur.B, 700, 205, 900);
-      await glide(cur.A, 230, 190, 900);
-      await wait(1500);
+
+      // 5. no monitor at all: DuoSeat makes a virtual one and streams it to his laptop
+      show('mon', '5. no monitor? DuoSeat makes a virtual one. it\'s like a screen share he can actually use.');
+      await wait(700); virtual(true);
+      await Promise.all([glide(cur.B, 610, 150, 1000), glide(cur.A, 230, 190, 900)]);
+      await wait(2600);
+      show('full', 'two people. one PC. zero fights over the mouse.');
+      await wait(2600);
     }
+  }
+
+  /* your own mouse is the blue one: it gets a "you" tag too */
+  const meTag = $('me');
+  if (matchMedia('(pointer: fine)').matches) {
+    addEventListener('pointermove', e => { meTag.style.transform = `translate(${e.clientX + 4}px, ${e.clientY + 27}px)`; meTag.classList.add('on'); });
+    document.addEventListener('pointerleave', () => meTag.classList.remove('on'));
   }
 
   /* ---------- Player B on the page: fixes the headline, presses download, wanders ---------- */
@@ -390,7 +474,8 @@
     await pglide(r.left + r.width * 0.62, r.top + r.height * 0.55, 1300); await wait(300);
     dl.classList.add('pressed'); await wait(140); dl.classList.remove('pressed'); await wait(700);
     while (true) {
-      await pglide(40 + Math.random() * (innerWidth - 80), innerHeight * (0.12 + Math.random() * 0.76), 1600 + Math.random() * 1600);
+      const top = document.querySelector('.napkin').getBoundingClientRect().bottom + 10, bottom = innerHeight - 40;   // stays off the drawing
+      await pglide(40 + Math.random() * (innerWidth - 80), top + Math.random() * Math.max(20, bottom - top), 1600 + Math.random() * 1600);
       await wait(900 + Math.random() * 2600);
     }
   }
