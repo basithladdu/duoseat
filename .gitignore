@@ -4,3 +4,4 @@ dist/
 test/*.log
 test/script-*.txt
 test/page.html
+site/.wrangler/

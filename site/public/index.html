@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DuoSeat</title>
+<meta name="description" content="Two people, one Windows PC, two cursors, two keyboards. Free and open source.">
+<meta property="og:title" content="DuoSeat">
+<meta property="og:description" content="Hand someone a cursor, not your laptop.">
+<meta property="og:image" content="https://duoseat.wedevit.in/logo.png">
+<meta name="theme-color" content="#0b3a80">
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/7.css@0.21.1/dist/7.css">
+<style>
+  :root {
+    --b: #ff8c00;          /* Player B, the orange cursor */
+    --a: #0078d7;          /* Player A, the blue cursor */
+    --g: #0bd82c;          /* Win7 progress green */
+    --g-dark: #2b9d2b;
+    --font: "Segoe UI", "Noto Sans", Tahoma, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 9pt var(--font);
+    overflow: hidden;
+    color: #222;
+    /* "Harmony"-ish: deep blue with a bright core and a few light streaks. No logo. */
+    background:
+      conic-gradient(from 196deg at 46% 46%, transparent 0deg, #ffffff1c 3deg, transparent 9deg, transparent 22deg, #9fe0ff22 25deg, transparent 33deg, transparent 300deg, #ffffff14 304deg, transparent 312deg),
+      radial-gradient(ellipse 60% 40% at 30% 70%, #7fd3ff33, transparent 70%),
+      radial-gradient(ellipse 50% 55% at 46% 46%, #bfe9ff 0, #5fb4f0 13%, #1e6fc8 33%, #0b3a80 62%, #061a3d 100%);
+    background-color: #0a2a5e;
+  }
+
+  /* ---------------- desktop ---------------- */
+  .desktop { position: fixed; inset: 0 0 40px 0; display: grid; place-items: center; padding: 16px; }
+  .icons { position: fixed; top: 12px; left: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .icon {
+    width: 76px; padding: 4px 2px; border: 1px solid transparent; border-radius: 3px; text-align: center;
+    color: #fff; text-decoration: none; text-shadow: 0 1px 2px #000, 0 0 6px #0008; font-size: 9pt;
+  }
+  .icon:hover { background: linear-gradient(#ffffff40, #ffffff1a); border-color: #ffffff66; }
+  .icon:focus { outline: none; background: linear-gradient(#7fb6ff80, #4b8fe866); border-color: #ffffff99; }
+  .icon img, .icon svg { width: 44px; height: 44px; display: block; margin: 0 auto 3px; filter: drop-shadow(0 2px 2px #0006); }
+
+  /* ---------------- the main window ---------------- */
+  .window.main { width: min(800px, 100%); }
+  .window.main .title-bar-text { display: flex; align-items: center; gap: 6px; }
+  .window.main .title-bar-text img { width: 16px; height: 16px; }
+  .window-body.pad { padding: 26px 28px 20px; margin: 0; background: #fff; }
+  .hero { display: grid; grid-template-columns: 1fr 300px; gap: 26px; align-items: center; }
+  h1 { font: 400 23pt var(--font); color: #003399; margin: 0 0 8px; letter-spacing: -.2px; }
+  h1 .b { color: var(--b); } h1 .a { color: var(--a); }
+  .sub { font-size: 11.5pt; color: #333; margin: 0 0 14px; line-height: 1.45; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .actions button { min-height: 32px; padding: 0 20px; font-size: 10pt; }
+  .fine { color: #6d6d6d; margin-top: 10px; }
+  .fine a { color: #0066cc; }
+
+  /* mini demo: two people typing in two windows at once */
+  .demo {
+    position: relative; height: 210px; border: 1px solid #8e8f8f; border-radius: 3px; overflow: hidden;
+    background: radial-gradient(ellipse at 45% 45%, #8fd0ff, #2f7fd0 55%, #0b3a80);
+    box-shadow: inset 0 0 0 1px #fff8;
+  }
+  .mini {
+    position: absolute; width: 136px; height: 86px; background: #fff; border-radius: 4px 4px 0 0;
+    box-shadow: 1px 2px 6px #0007; border: 1px solid #0008; font: 8pt Consolas, monospace; overflow: hidden;
+  }
+  .mini .bar { height: 13px; background: linear-gradient(#bcd4ef, #8fb3dd); border-bottom: 1px solid #6c8bb3; font: 7pt var(--font); padding: 0 4px; line-height: 13px; color: #123; }
+  .mini .txt { padding: 3px 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.25; }
+  .mini.left { left: 12px; top: 18px; }
+  .mini.right { right: 12px; top: 92px; }
+  .mini.left.focus { outline: 2px solid var(--a); }
+  .mini.right.focus { outline: 2px solid var(--b); }
+  .cur { position: absolute; width: 18px; height: 22px; transition: left 1.2s ease-in-out, top 1.2s ease-in-out; z-index: 2; }
+  .cur svg { width: 100%; height: 100%; filter: drop-shadow(1px 1px 1px #0008); }
+  .demo .tag { position: absolute; bottom: 5px; left: 0; right: 0; text-align: center; color: #fff; font-size: 8pt; text-shadow: 0 1px 2px #000; }
+
+  .window.main .status-bar { margin: 0; }
+
+  /* ---------------- copy dialog (Download) ---------------- */
+  .copy { position: fixed; z-index: 30; left: 50%; top: 42%; transform: translate(-50%, -50%); width: min(380px, 92vw); display: none; }
+  .copy .window-body { margin: 0; padding: 14px 16px; background: #fff; }
+  .copy .what { font-size: 11pt; color: #003399; margin-bottom: 4px; }
+  .copy .from { color: #555; margin-bottom: 10px; }
+  .copy [role=progressbar] { margin: 6px 0 8px; }
+  .copy [role=progressbar] > div { transition: width 1.3s cubic-bezier(.3,.7,.4,1); }
+
+  /* ---------------- taskbar ---------------- */
+  .taskbar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 40px; z-index: 20; display: flex; align-items: stretch;
+    background: linear-gradient(#ffffff26, #ffffff08 50%, #0000 50%), rgba(18, 38, 58, .62);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    box-shadow: inset 0 1px #fff4, 0 -1px #0008;
+  }
+  .orb {
+    width: 54px; display: grid; place-items: center; border: 0; background: none; padding: 0; min-width: 0; min-height: 0; cursor: pointer;
+  }
+  .orb span {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 30%, #fff9 0 18%, transparent 45%), radial-gradient(circle at 50% 85%, #5dffb0, var(--g-dark) 55%, #0b3d14);
+    box-shadow: 0 0 0 1px #0009, inset 0 0 0 1px #fff6, 0 0 8px #5dffb066; transition: box-shadow .3s;
+  }
+  .orb:hover span { box-shadow: 0 0 0 1px #0009, inset 0 0 0 1px #fffa, 0 0 14px 3px #8dffc8aa; }
+  .orb img { width: 20px; height: 20px; filter: drop-shadow(0 1px 1px #0008); }
+  .pins { display: flex; gap: 2px; padding-left: 4px; }
+  .pin {
+    --c: #7fd3ff; width: 60px; display: grid; place-items: center; border-radius: 3px; position: relative; text-decoration: none;
+    border: 1px solid transparent; margin: 1px 0;
+  }
+  .pin img, .pin svg { width: 26px; height: 26px; filter: drop-shadow(0 1px 1px #0008); }
+  .pin.running { border-color: #ffffff59; background: linear-gradient(#fff3, #fff1 50%, #0000 50%); }
+  .pin:hover { background: radial-gradient(circle at 50% 110%, var(--c) 0, transparent 75%), linear-gradient(#fff3, #fff1 50%, #0000 50%); border-color: #ffffff80; box-shadow: inset 0 0 0 1px #fff4; }
+  .spacer { flex: 1; }
+  .tray { display: flex; align-items: center; gap: 10px; color: #fff; padding: 0 8px; font-size: 9pt; }
+  .tray .chev { opacity: .85; font-size: 8pt; }
+  .clock { text-align: center; line-height: 1.25; padding: 2px 6px; border-radius: 3px; min-width: 72px; }
+  .clock:hover { background: #ffffff26; }
+  .peek { width: 15px; border-left: 1px solid #ffffff40; box-shadow: inset 1px 0 #0006; background: linear-gradient(#ffffff1a, #ffffff05); cursor: pointer; }
+  .peek:hover { background: #ffffff38; }
+  /* Aero Peek: hover the sliver, windows turn into outlines */
+  .window, .icons { transition: opacity .3s; }
+  body:has(.peek:hover) .desktop .window { opacity: 0; outline: 1px solid #fff9; outline-offset: 0; }
+
+  /* tray balloon */
+  .balloon { position: fixed; right: 18px; bottom: 50px; z-index: 25; max-width: 270px; opacity: 0; transform: translateY(6px); transition: opacity .4s, transform .4s; pointer-events: none; }
+  .balloon.show { opacity: 1; transform: none; pointer-events: auto; }
+  .balloon b { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .balloon b img { width: 16px; height: 16px; }
+  .balloon .x { position: absolute; top: 4px; right: 7px; cursor: pointer; color: #666; font-size: 10pt; }
+
+  @media (max-width: 700px) {
+    body { overflow: auto; }
+    .icons { display: none; }
+    .desktop { position: static; min-height: calc(100vh - 40px); padding: 14px 10px 54px; }
+    .hero { grid-template-columns: 1fr; }
+    .demo { height: 200px; }
+    .tray .net, .pins .pin:not(.running) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cur { transition: none; } }
+</style>
+</head>
+<body>
+
+<nav class="icons" aria-label="Desktop">
+  <a class="icon" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe" data-download>
+    <img src="/logo.png" alt="">DuoSeat.exe
+  </a>
+  <a class="icon" href="https://github.com/basithladdu/duoseat">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="fd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#e2b54a"/></linearGradient></defs><path d="M4 12h15l4 4h21v24H4z" fill="#d9a63a"/><path d="M4 18h40v22H4z" fill="url(#fd)"/><path d="M4 18h40" stroke="#fff8"/></svg>
+    Source code
+  </a>
+  <a class="icon" href="https://github.com/basithladdu/duoseat#readme">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 4h20l8 8v32H10z" fill="#fff" stroke="#8a8a8a"/><path d="M30 4v8h8" fill="#e8e8e8" stroke="#8a8a8a"/><g stroke="#9bb4d6" stroke-width="2"><path d="M15 20h18M15 25h18M15 30h18M15 35h12"/></g></svg>
+    README.txt
+  </a>
+</nav>
+
+<main class="desktop">
+  <div class="window glass active main" id="main">
+    <div class="title-bar">
+      <div class="title-bar-text"><img src="/logo.png" alt="">DuoSeat</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize" data-nope="Minimized to nowhere. Click the taskbar icon."></button>
+        <button aria-label="Maximize" data-nope="It's already the best size."></button>
+        <button aria-label="Close" data-nope="Nice try. It's open source, it doesn't close."></button>
+      </div>
+    </div>
+    <div class="window-body pad">
+      <div class="hero">
+        <div>
+          <h1>Hand someone a <span class="b">cursor</span>,<br>not your laptop.</h1>
+          <p class="sub">DuoSeat gives a second person their own mouse and keyboard on your Windows PC. You both work at the same time. Nobody fights over the pointer.</p>
+          <div class="actions">
+            <button class="default" data-download-btn>Download DuoSeat.exe</button>
+            <button onclick="location.href='https://github.com/basithladdu/duoseat'">GitHub</button>
+          </div>
+          <div class="fine">130 KB &middot; Windows 10/11 &middot; no install &middot; free, <a href="https://github.com/basithladdu/duoseat/blob/main/LICENSE">MIT</a></div>
+        </div>
+        <div class="demo" aria-label="Two people typing in two windows at once">
+          <div class="mini left focus"><div class="bar">your doc</div><div class="txt" id="ta"></div></div>
+          <div class="mini right focus"><div class="bar">their doc</div><div class="txt" id="tb"></div></div>
+          <div class="cur" id="ca" style="left:60px;top:60px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#0078d7" stroke="#fff" stroke-width="1.3"/></svg></div>
+          <div class="cur" id="cb" style="left:150px;top:110px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.3"/></svg></div>
+          <div class="tag">you&nbsp;&nbsp;+&nbsp;&nbsp;them, same PC, same second</div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <p class="status-bar-field">Same Wi-Fi, a phone, or another city</p>
+      <p class="status-bar-field">No TV? It makes a screen</p>
+      <p class="status-bar-field">v1.2.1</p>
+    </div>
+  </div>
+</main>
+
+<div class="window active copy" id="copy" aria-live="polite" aria-label="Copying">
+  <div class="title-bar"><div class="title-bar-text">Copying 1 item (130 KB)</div>
+    <div class="title-bar-controls"><button aria-label="Close" id="copyX"></button></div></div>
+  <div class="window-body">
+    <div class="what">Copying DuoSeat.exe</div>
+    <div class="from">from <b>github.com</b> to <b>Downloads</b></div>
+    <div role="progressbar" class="animate"><div id="bar" style="width:0%"></div></div>
+    <div id="eta">About 2 seconds remaining</div>
+  </div>
+</div>
+
+<div class="balloon" id="balloon">
+  <div role="tooltip" class="is-top is-left" style="position:relative">
+    <span class="x" id="bx">&times;</span>
+    <b><img src="/logo.png" alt="">Player B connected</b>
+    Your cursor stays yours. Theirs is the orange one.
+  </div>
+</div>
+
+<footer class="taskbar">
+  <button class="orb" title="DuoSeat" onclick="document.getElementById('main').scrollIntoView({behavior:'smooth'})"><span><img src="/logo.png" alt="DuoSeat"></span></button>
+  <div class="pins">
+    <a class="pin running" style="--c:#ff9d2e" href="#" title="DuoSeat" onclick="return false"><img src="/logo.png" alt="DuoSeat"></a>
+    <a class="pin" style="--c:#c9d1d9" href="https://github.com/basithladdu/duoseat" title="GitHub">
+      <svg viewBox="0 0 16 16" aria-label="GitHub"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+    <a class="pin" style="--c:#5dffb0" href="https://github.com/basithladdu/duoseat/releases" title="All releases">
+      <svg viewBox="0 0 24 24" aria-label="Releases"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M4 17v3h16v-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+  <div class="spacer"></div>
+  <div class="tray">
+    <span class="chev" title="Show hidden icons">&#9650;</span>
+    <svg class="net" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="#fff"><rect x="1" y="11" width="2.5" height="4"/><rect x="5" y="8" width="2.5" height="7"/><rect x="9" y="5" width="2.5" height="10"/><rect x="13" y="2" width="2.5" height="13" opacity=".45"/></g></svg>
+    <div class="clock" id="clock"><div id="t"></div><div id="d"></div></div>
+  </div>
+  <div class="peek" title="Peek at desktop"></div>
+</footer>
+
+<script>
+  const EXE = 'https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe';
+
+  // taskbar clock
+  function tick() {
+    const n = new Date();
+    document.getElementById('t').textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    document.getElementById('d').textContent = n.toLocaleDateString();
+  }
+  tick(); setInterval(tick, 10000);
+
+  // Win7 copy dialog, then the real download
+  const copy = document.getElementById('copy'), bar = document.getElementById('bar'), eta = document.getElementById('eta');
+  function download(e) {
+    if (e) e.preventDefault();
+    copy.style.display = 'block'; bar.style.width = '0%'; eta.textContent = 'About 2 seconds remaining';
+    requestAnimationFrame(() => requestAnimationFrame(() => bar.style.width = '100%'));
+    setTimeout(() => { eta.textContent = 'About 0 seconds remaining'; location.href = EXE; }, 1300);
+    setTimeout(() => { eta.textContent = 'Done. It\'s in your Downloads. Run it on both PCs.'; }, 2100);
+    setTimeout(() => { copy.style.display = 'none'; }, 5200);
+  }
+  document.querySelectorAll('[data-download],[data-download-btn]').forEach(el => el.addEventListener('click', download));
+  document.getElementById('copyX').onclick = () => copy.style.display = 'none';
+
+  // tray balloon
+  const balloon = document.getElementById('balloon'), say = balloon.querySelector('[role=tooltip]');
+  const defaultBalloon = say.innerHTML;
+  function pop(html, ms) {
+    say.innerHTML = html; balloon.classList.add('show');
+    document.getElementById('bx').onclick = () => balloon.classList.remove('show');
+    clearTimeout(pop.t); pop.t = setTimeout(() => balloon.classList.remove('show'), ms || 5000);
+  }
+  setTimeout(() => pop(defaultBalloon), 1800);
+  document.querySelectorAll('[data-nope]').forEach(b => b.addEventListener('click', () =>
+    pop('<span class="x" id="bx">&times;</span><b><img src="/logo.png" alt="">DuoSeat</b>' + b.dataset.nope, 3500)));
+
+  // the demo: two cursors, two windows, typing at the same time
+  const ta = document.getElementById('ta'), tb = document.getElementById('tb');
+  const ca = document.getElementById('ca'), cb = document.getElementById('cb');
+  const A = 'budget.xlsx\ndone by 6', B = 'fixed ur\nwifi lol';
+  let i = 0;
+  function step() {
+    if (i === 0) { ta.textContent = ''; tb.textContent = ''; ca.style.left = '58px'; ca.style.top = '52px'; cb.style.left = '178px'; cb.style.top = '108px'; }
+    if (i > 2) { const k = i - 3; if (k < A.length) ta.textContent += A[k]; if (k < B.length) tb.textContent += B[k]; }
+    i++;
+    if (i > Math.max(A.length, B.length) + 18) {
+      i = 0; ca.style.left = '150px'; ca.style.top = '30px'; cb.style.left = '40px'; cb.style.top = '120px';
+    }
+  }
+  setInterval(step, 140);
+</script>
+</body>
+</html>

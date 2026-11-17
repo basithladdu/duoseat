@@ -1,0 +1,7 @@
+# duoseat.wedevit.in - a static page served by a Cloudflare Worker (assets only, no code)
+name = "duoseat-site"
+compatibility_date = "2025-06-01"
+routes = [{ pattern = "duoseat.wedevit.in", custom_domain = true }]
+
+[assets]
+directory = "./public"

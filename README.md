@@ -2,7 +2,7 @@
 
 <h1 align="center">DuoSeat</h1>
 <p align="center"><b>Two people. One Windows PC. Zero cursor fights.</b></p>
-<p align="center"><a href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><b>⬇ Download DuoSeat.exe</b></a> &nbsp;·&nbsp; ~130 KB · Windows 10/11 · nothing to install</p>
+<p align="center"><a href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><b>⬇ Download DuoSeat.exe</b></a> &nbsp;·&nbsp; ~130 KB · Windows 10/11 · nothing to install &nbsp;·&nbsp; <a href="https://duoseat.wedevit.in">duoseat.wedevit.in</a></p>
 
 ![how it works](docs/how-it-works.svg)
 
@@ -99,6 +99,7 @@ That gives you `dist\DuoSeat.exe`.
 | `src/Extras.cs` | virtual screen, internet link, signature checks, PIN lockout, own clipboard |
 | `src/Aero.cs` | the Windows 7 look |
 | `src/Common.cs` | protocol and Win32 imports |
+| `site/` | the website, a Cloudflare Worker serving static files (`cd site && wrangler deploy`) |
 
 ## Next up
 
