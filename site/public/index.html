@@ -11,82 +11,147 @@
 <meta name="theme-color" content="#d5e5f7">
 <link rel="icon" href="/favicon.ico">
 <style>
-  /* Same look as the DuoSeat app itself (src/Aero.cs): header band, white body, grey footer strip,
+  /* Same look as the DuoSeat app (src/Aero.cs): header band, white body, grey footer strip,
      command links with the green arrow, glossy push buttons. */
   :root {
-    --ink: #1e3287;        /* app heading blue */
-    --link-ink: #151c55;   /* command link heading */
-    --note: #444;
-    --b: #ff8c00;          /* Player B's cursor */
-    --a: #0078d7;          /* Player A's cursor */
+    --ink: #1e3287; --link-ink: #151c55; --note: #444;
+    --b: #ff8c00; --a: #0078d7; --g: #0bd82c;
     --font: "Segoe UI", "Noto Sans", Tahoma, sans-serif;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body { font: 14px/1.45 var(--font); color: #222; background: #fff; display: flex; flex-direction: column; min-height: 100vh; }
-  a { color: #0066cc; }
-  a:hover { color: #3399ff; }
+  html, body { margin: 0; }
+  body { font: 14px/1.45 var(--font); color: #222; background: #fff; min-height: 100vh; display: flex; flex-direction: column; }
+  a { color: #0066cc; } a:hover { color: #3399ff; }
 
-  /* header band */
   header { background: linear-gradient(#ffffff, #d5e5f7); border-bottom: 1px solid #9ab8de; }
-  .band { max-width: 1040px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
-  .band img { width: 56px; height: 56px; }
+  .band { max-width: 1080px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .band > img { width: 56px; height: 56px; }
   .band h1 { margin: 0; font: 400 28px var(--font); color: var(--ink); line-height: 1.1; }
   .band p { margin: 3px 0 0; color: var(--note); }
-  .band .ver { margin-left: auto; color: #666; font-size: 12px; text-align: right; }
+  .band .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
-  /* body */
-  main { flex: 1; max-width: 1040px; width: 100%; margin: 0 auto; padding: 30px 24px 26px; display: grid; grid-template-columns: minmax(0, 1fr) 470px; gap: 40px; align-items: start; }
-  .lead { font: 400 24px/1.3 var(--font); color: var(--ink); margin: 2px 0 10px; }
-  .lead .b { color: var(--b); }
-  .intro { color: #333; margin: 0 0 18px; max-width: 470px; }
-
-  /* command links, exactly like the app's "I'm Player A / I'm Player B" */
-  .cl { display: grid; grid-template-columns: 30px 1fr; gap: 0 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 3px; color: inherit; text-decoration: none; margin: 0 -12px 4px; }
-  .cl:hover, .cl:focus-visible { background: linear-gradient(#f7fbff, #e5f3fb); border-color: #c6e2f7; color: inherit; outline: none; }
-  .cl svg { width: 22px; height: 22px; margin-top: 3px; }
-  .cl b { display: block; font: 400 17px var(--font); color: var(--link-ink); }
-  .cl span { color: var(--note); font-size: 13px; }
-
-  .keys { margin-top: 18px; font-size: 12.5px; color: #555; border-top: 1px solid #e5e5e5; padding-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; }
-  kbd { font: 12px var(--font); background: linear-gradient(#fdfdfd, #ececec); border: 1px solid #b5b5b5; border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
-
-  /* the real app windows, stacked like they'd sit on a desktop */
-  .shots { position: relative; height: 430px; }
-  .shots img { position: absolute; border-radius: 7px 7px 0 0; box-shadow: 0 8px 26px #0003, 0 1px 3px #0003; border: 1px solid #7895b8; background: #fff; }
-  .shots .s1 { width: 300px; left: 0; top: 0; z-index: 1; }
-  .shots .s2 { width: 290px; right: 0; top: 70px; z-index: 2; }
-  .shots .s3 { width: 290px; left: 40px; top: 220px; z-index: 3; }
-  .tagb, .taga { position: absolute; z-index: 4; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px 2px 4px; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px #0003; }
-  .tagb { color: var(--b); right: 6px; top: 46px; }
-  .taga { color: var(--a); left: 26px; top: 196px; }
-  .tagb svg, .taga svg { width: 14px; height: 17px; }
-
-  /* footer strip, like the app's grey button bar */
-  footer { background: #f0f0f0; border-top: 1px solid #dfdfdf; }
-  .strip { max-width: 1040px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 8px; color: #555; font-size: 12.5px; flex-wrap: wrap; }
-  .strip .grow { flex: 1; }
-  .btn { display: inline-block; font: 13px var(--font); color: #000; text-decoration: none; padding: 5px 18px; border: 1px solid #707070; border-radius: 3px;
+  .btn { display: inline-flex; align-items: center; gap: 7px; font: 13px var(--font); color: #000; text-decoration: none; padding: 5px 16px; border: 1px solid #707070; border-radius: 3px; cursor: pointer;
     background: linear-gradient(#f2f2f2 0%, #ebebeb 50%, #dddddd 51%, #cfcfcf 100%); box-shadow: inset 0 0 0 1px #ffffffaa; }
   .btn:hover { color: #000; border-color: #3c7fb1; background: linear-gradient(#eaf6fd 0%, #d9f0fc 50%, #bee6fd 51%, #a7d9f5 100%); }
   .btn:active { border-color: #2c628b; background: linear-gradient(#e5f4fc 0%, #c4e5f6 50%, #98d1ef 51%, #68b3db 100%); }
-  .btn.default { border-color: #3c7fb1; box-shadow: inset 0 0 0 1px #ffffffaa, 0 0 0 1px #9fd2f3; }
+  .btn.default { border-color: #3c7fb1; box-shadow: inset 0 0 0 1px #ffffffaa, 0 0 0 1px #9fd2f3; animation: pulse 1.6s ease-in-out infinite alternate; }
+  @keyframes pulse { from { box-shadow: inset 0 0 0 1px #ffffffaa, 0 0 0 1px #9fd2f3; } to { box-shadow: inset 0 0 3px 1px #34deffdd, 0 0 0 1px #9fd2f3; } }
+  .btn svg, .btn img { width: 16px; height: 16px; }
 
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; gap: 26px; padding-top: 22px; }
-    .shots { height: auto; display: grid; gap: 14px; justify-items: center; }
-    .shots img, .shots .s1, .shots .s2, .shots .s3 { position: static; width: min(360px, 100%); }
-    .tagb, .taga { display: none; }
-    .band .ver { display: none; }
+  main { flex: 1; max-width: 1080px; width: 100%; margin: 0 auto; padding: 28px 24px 10px; display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 40px; align-items: start; }
+  .lead { font: 400 25px/1.3 var(--font); color: var(--ink); margin: 0 0 10px; }
+  .lead .b { color: var(--b); }
+  .intro { color: #333; margin: 0 0 16px; max-width: 470px; }
+
+  /* command links, like the app's "I'm Player A / I'm Player B" */
+  .cl { display: grid; grid-template-columns: 34px 1fr; gap: 0 10px; padding: 9px 12px; border: 1px solid transparent; border-radius: 3px; color: inherit; text-decoration: none; margin: 0 -12px 2px; }
+  .cl:hover, .cl:focus-visible { background: linear-gradient(#f7fbff, #e5f3fb); border-color: #c6e2f7; color: inherit; outline: none; }
+  .cl .ic { width: 30px; height: 30px; margin-top: 1px; }
+  .cl .arrow { width: 22px; height: 22px; margin: 4px 0 0 4px; }
+  .cl b { display: block; font: 400 17px var(--font); color: var(--link-ink); }
+  .cl span { color: var(--note); font-size: 13px; }
+
+  .keys { margin-top: 14px; font-size: 12.5px; color: #555; border-top: 1px solid #e5e5e5; padding-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
+  kbd { font: 12px var(--font); background: linear-gradient(#fdfdfd, #ececec); border: 1px solid #b5b5b5; border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; white-space: nowrap; justify-self: start; }
+
+  /* ---------------- the live scene ---------------- */
+  main > section { min-width: 0; }
+  .stage-wrap { position: relative; width: 100%; max-width: 500px; overflow: hidden; }
+  .stage { position: relative; width: 500px; height: 390px; transform-origin: 0 0; border-radius: 6px; overflow: hidden; border: 1px solid #7895b8;
+    background: radial-gradient(ellipse 70% 60% at 40% 35%, #dff0ff, #a9d1f3 45%, #5f9fd8); box-shadow: 0 10px 30px #0002; user-select: none; }
+  .w { position: absolute; background: #fff; border: 1px solid #6d8fba; border-radius: 5px 5px 0 0; box-shadow: 0 4px 14px #0003; overflow: hidden; transition: left .45s ease, top .45s ease, transform .3s ease, opacity .3s ease; }
+  .w .tb { height: 22px; display: flex; align-items: center; gap: 5px; padding: 0 0 0 6px; font-size: 11px; color: #123; background: linear-gradient(#ffffff, #d5e5f7); border-bottom: 1px solid #9ab8de; }
+  .w .tb img { width: 14px; height: 14px; }
+  .w .tb .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w .cap { display: flex; height: 100%; }
+  .w .cap i { width: 24px; height: 100%; display: grid; place-items: center; font-style: normal; font-size: 10px; color: #333; border-left: 1px solid #c8d6e8; }
+  .w .cap i.x { background: linear-gradient(#e8a596, #cf5a43); color: #fff; width: 30px; border-left-color: #a33; }
+  .w .cap i.hot { background: linear-gradient(#bfe2f8, #6fb3e3); }
+  .w.ra { outline: 2px solid var(--a); } .w.rb { outline: 2px solid var(--b); }
+  .w.min { transform: translate(var(--mx, 0), var(--my, 0)) scale(.1); opacity: 0; }
+  textarea.doc { display: block; width: 100%; height: calc(100% - 22px); border: 0; outline: none; resize: none; padding: 6px 8px; font: 12.5px/1.45 Consolas, "Lucida Console", monospace; color: #111; background: #fff; }
+  #wa { left: 18px; top: 22px; width: 250px; height: 148px; }
+  #wb { left: 236px; top: 168px; width: 246px; height: 140px; }
+  #wd { left: 292px; top: 16px; width: 190px; height: 112px; font-size: 11px; }
+  #wd .body { padding: 8px 10px; line-height: 1.5; }
+  #wd .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #aaa; margin-right: 5px; vertical-align: 0; transition: background .3s; }
+  #wd.on .dot { background: var(--g); box-shadow: 0 0 6px var(--g); }
+  #wd .pin { font: 700 18px Consolas, monospace; color: var(--ink); letter-spacing: 2px; }
+
+  .setup { position: absolute; left: 50%; top: 42%; width: 290px; transform: translate(-50%, -50%); z-index: 30; transition: opacity .35s; }
+  .setup .body { padding: 12px 14px; font-size: 12px; }
+  .setup .what { color: var(--ink); font-size: 14px; margin-bottom: 8px; }
+  .bar { height: 15px; border: 1px solid #8e8f8f; border-radius: 3px; overflow: hidden; background: linear-gradient(#f3f3f3, #fcfcfc 3px, #dbdbdb 6px, #cacaca 6px, #d5d5d5); }
+  .bar > div { height: 100%; width: 0%; position: relative; overflow: hidden;
+    background: linear-gradient(#5bf06f, #2fdc47 40%, #0bd82c 41%, #14c836); transition: width 1.5s cubic-bezier(.3,.6,.4,1); }
+  .bar > div::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, #ffffff99, transparent); animation: shine 1.6s linear infinite; }
+  @keyframes shine { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+
+  .task { position: absolute; left: 0; right: 0; bottom: 0; height: 30px; display: flex; gap: 4px; padding: 3px 6px; align-items: center; z-index: 25;
+    background: linear-gradient(#ffffff26, #ffffff08 50%, #0000 50%), rgba(18, 38, 58, .62); box-shadow: inset 0 1px #fff4; }
+  .task span { width: 34px; height: 24px; border-radius: 3px; display: grid; place-items: center; border: 1px solid #ffffff59; background: linear-gradient(#fff3, #fff1 50%, #0000 50%); transition: background .2s; }
+  .task span img { width: 16px; height: 16px; }
+  .task span.hot { background: radial-gradient(circle at 50% 110%, #ffb54d, transparent 75%), linear-gradient(#fff4, #fff1 50%, #0000 50%); }
+  .task .clock { margin-left: auto; color: #fff; font-size: 10px; text-align: right; line-height: 1.15; }
+
+  .balloon { position: absolute; right: 10px; bottom: 38px; z-index: 28; width: 200px; padding: 7px 9px; font-size: 11px; background: linear-gradient(#fff, #ebebeb); border: 1px solid #0006; border-radius: 5px; box-shadow: 4px 4px 6px -3px #0006; opacity: 0; transform: translateY(5px); transition: .35s; }
+  .balloon.show { opacity: 1; transform: none; }
+  .balloon b { display: block; font-size: 11.5px; }
+
+  .cur { position: absolute; z-index: 40; width: 20px; height: 24px; transition: left var(--d, .6s) cubic-bezier(.45,.05,.3,1), top var(--d, .6s) cubic-bezier(.45,.05,.3,1), opacity .3s; pointer-events: none; }
+  .cur svg { width: 100%; height: 100%; filter: drop-shadow(1px 1px 1px #0008); transition: transform .12s; }
+  .cur.press svg { transform: scale(.82); }
+  .cur em { position: absolute; left: 15px; top: 19px; font: 600 10px var(--font); font-style: normal; color: #fff; padding: 0 5px; border-radius: 3px; white-space: nowrap; }
+  #ca em { background: var(--a); } #cb em { background: var(--b); }
+  #ca.you em::after { content: " (that's you)"; }
+
+  .steps { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+  .steps button { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #7895b8; background: #fff; padding: 0; cursor: pointer; }
+  .steps button.on { background: var(--a); border-color: var(--a); }
+  .caption { flex: 1; font-size: 13px; color: #333; min-height: 38px; display: block; padding-top: 9px; margin-left: 4px; }
+  .caption b { color: var(--ink); font-weight: 600; margin-right: 6px; }
+  .try { font-size: 12px; color: #666; margin-top: 2px; }
+  .try b { color: var(--a); font-weight: 600; }
+
+  /* ---------------- contact ---------------- */
+  .contact { max-width: 1080px; width: 100%; margin: 6px auto 0; padding: 18px 24px 26px; border-top: 1px solid #e5e5e5; display: grid; grid-template-columns: 300px 1fr; gap: 26px; align-items: start; }
+  .contact h2 { margin: 0 0 4px; font: 400 21px var(--font); color: var(--ink); }
+  .contact p { margin: 0; color: var(--note); font-size: 13px; }
+  .socials { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .so { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid #d9e2ec; border-radius: 4px; color: #222; text-decoration: none; background: linear-gradient(#fff, #f5f8fb); cursor: pointer; font: 13px var(--font); text-align: left; transition: transform .15s, box-shadow .15s, border-color .15s; }
+  .so:hover { color: #222; border-color: #c6e2f7; background: linear-gradient(#f7fbff, #e5f3fb); transform: translateY(-1px); box-shadow: 0 3px 8px #0001; }
+  .so svg { width: 22px; height: 22px; flex: 0 0 22px; }
+  .so span { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .so small { color: #666; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .so.ok small { color: #0a8a2a; }
+
+  footer { background: #f0f0f0; border-top: 1px solid #dfdfdf; }
+  .strip { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 8px; color: #555; font-size: 12.5px; flex-wrap: wrap; }
+  .strip .grow { flex: 1; }
+
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; gap: 22px; }
+    .contact { grid-template-columns: 1fr; gap: 12px; }
   }
-  @media (max-width: 480px) {
-    .band { padding: 14px 16px; } .band img { width: 44px; height: 44px; } .band h1 { font-size: 24px; }
-    main { padding: 18px 16px; } .lead { font-size: 21px; }
+  @media (max-width: 600px) {
+    .band { padding: 12px 16px; gap: 12px; } .band > img { width: 44px; height: 44px; } .band h1 { font-size: 24px; }
+    .band p { font-size: 12.5px; } .band .right .btn span { display: none; } .band .right .btn { padding: 5px 9px; }
+    main { padding: 18px 16px 6px; } .lead { font-size: 22px; }
+    .contact { padding: 16px; } .socials { grid-template-columns: 1fr 1fr; }
     .strip { padding: 12px 16px; }
   }
+  @media (prefers-reduced-motion: reduce) { .cur, .w, .bar > div { transition: none; } .btn.default { animation: none; } }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cc83d"/><stop offset="1" stop-color="#1e8a16"/></linearGradient>
+    <radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285AEB"/></radialGradient>
+    <symbol id="i-gh" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol>
+  </defs>
+</svg>
+
 <header>
   <div class="band">
     <img src="/logo.png" alt="">
@@ -94,7 +159,10 @@
       <h1>DuoSeat</h1>
       <p>Two people, one PC. Each gets their own cursor and keyboard.</p>
     </div>
-    <div class="ver">v1.2.1 &middot; Windows 10/11<br>free, MIT</div>
+    <div class="right">
+      <a class="btn" href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener"><svg fill="#181717"><use href="#i-gh"/></svg><span>GitHub</span></a>
+      <a class="btn default" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><img src="/logo.png" alt=""><span>Download</span></a>
+    </div>
   </div>
 </header>
 
@@ -104,16 +172,16 @@
     <p class="intro">Your friend sits next to you with their own laptop. DuoSeat turns their mouse and keyboard into a second, orange cursor on your PC. You keep yours. Both of you type at the same time and nothing lands in the wrong window.</p>
 
     <a class="cl" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe">
-      <svg viewBox="0 0 22 22" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cc83d"/><stop offset="1" stop-color="#1e8a16"/></linearGradient></defs><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
+      <img class="ic" src="/logo.png" alt="">
       <div><b>Download DuoSeat.exe</b><span>130 KB. Same file on both laptops, nothing to install.</span></div>
     </a>
-    <a class="cl" href="https://github.com/basithladdu/duoseat#no-app-use-a-browser-phone-works">
-      <svg viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
+    <a class="cl" href="https://github.com/basithladdu/duoseat#no-app-use-a-browser-phone-works" target="_blank" rel="noopener">
+      <svg class="arrow" viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
       <div><b>No app on the other side?</b><span>Any phone or browser works. Open the link Player A shows, type the PIN.</span></div>
     </a>
-    <a class="cl" href="https://github.com/basithladdu/duoseat">
-      <svg viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
-      <div><b>Read the code</b><span>Every line is on GitHub. Built with the C# compiler Windows already has.</span></div>
+    <a class="cl" href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener">
+      <svg class="ic" viewBox="0 0 24 24" fill="#181717" aria-hidden="true" style="padding:3px"><use href="#i-gh"/></svg>
+      <div><b>github.com/basithladdu/duoseat</b><span>Every line is open. MIT. Built with the C# compiler Windows already has.</span></div>
     </a>
 
     <div class="keys">
@@ -123,21 +191,189 @@
     </div>
   </section>
 
-  <section class="shots" aria-label="The DuoSeat app">
-    <img class="s1" src="/choose.png" alt="DuoSeat asks: I'm Player A, or I'm Player B">
-    <img class="s2" src="/player-b.png" alt="Player B window: address, PIN, Connect, Take control">
-    <img class="s3" src="/player-a.png" alt="Player A window: address, PIN, Player B's screen, click mode">
-    <span class="tagb"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.3"/></svg>their laptop</span>
-    <span class="taga"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#0078d7" stroke="#fff" stroke-width="1.3"/></svg>your laptop</span>
+  <section aria-label="DuoSeat, shown live">
+    <div class="stage-wrap" id="wrap">
+      <div class="stage" id="stage">
+        <div class="w" id="wa">
+          <div class="tb"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 1h7l3 3v11H3z' fill='%23fff' stroke='%237a8ba3'/%3E%3Cpath d='M5 7h6M5 9h6M5 11h4' stroke='%230078d7'/%3E%3C/svg%3E" alt=""><span class="t">notes.txt - your window</span><span class="cap"><i>&#8211;</i><i>&#9633;</i><i class="x">&#10005;</i></span></div>
+          <textarea class="doc" id="ta" spellcheck="false" aria-label="Your window: type here"></textarea>
+        </div>
+        <div class="w" id="wb">
+          <div class="tb"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 1h7l3 3v11H3z' fill='%23fff' stroke='%237a8ba3'/%3E%3Cpath d='M5 7h6M5 9h6M5 11h4' stroke='%23ff8c00'/%3E%3C/svg%3E" alt=""><span class="t">wifi-fix.txt - their window</span><span class="cap"><i>&#8211;</i><i>&#9633;</i><i class="x">&#10005;</i></span></div>
+          <textarea class="doc" id="tb" readonly tabindex="-1" aria-hidden="true"></textarea>
+        </div>
+        <div class="w" id="wd">
+          <div class="tb"><img src="/logo.png" alt=""><span class="t">DuoSeat - Player A</span><span class="cap"><i id="dmin">&#8211;</i><i class="x">&#10005;</i></span></div>
+          <div class="body">PIN <span class="pin">4821</span><br><span class="dot"></span><span id="dstat">Waiting for Player B...</span></div>
+        </div>
+        <div class="w setup" id="setup">
+          <div class="tb"><img src="/logo.png" alt=""><span class="t">DuoSeat</span><span class="cap"><i class="x">&#10005;</i></span></div>
+          <div class="body"><div class="what" id="setupWhat">Adding a second cursor...</div><div class="bar"><div id="bar"></div></div><div style="margin-top:6px;color:#555" id="setupEta">About 2 seconds remaining</div></div>
+        </div>
+        <div class="balloon" id="balloon"><b>Player B connected</b>Your cursor stays yours. Theirs is the orange one.</div>
+        <div class="task"><span><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 1h7l3 3v11H3z' fill='%23fff' stroke='%237a8ba3'/%3E%3Cpath d='M5 7h6M5 9h6' stroke='%230078d7'/%3E%3C/svg%3E" alt=""></span><span><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 1h7l3 3v11H3z' fill='%23fff' stroke='%237a8ba3'/%3E%3Cpath d='M5 7h6M5 9h6' stroke='%23ff8c00'/%3E%3C/svg%3E" alt=""></span><span id="tdu"><img src="/logo.png" alt=""></span><div class="clock" id="clk"></div></div>
+        <div class="cur" id="ca" style="left:150px;top:110px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#0078d7" stroke="#fff" stroke-width="1.3"/></svg><em>A</em></div>
+        <div class="cur" id="cb" style="left:520px;top:250px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.3"/></svg><em>B</em></div>
+      </div>
+    </div>
+    <div class="steps" id="steps"><div class="caption" id="caption"></div></div>
+    <div class="try"><b>Try it:</b> click "your window" and type. Player B won't stop.</div>
   </section>
 </main>
 
+<section class="contact" id="contact">
+  <div>
+    <h2>Say hi</h2>
+    <p>DM me on Instagram. I'm not Kylie Jenner. Bugs, ideas, or "it worked!" all welcome.</p>
+  </div>
+  <div class="socials">
+    <a class="so" href="https://instagram.com/basithladdu" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="url(#ig)"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg><span>Instagram<small>@basithladdu &middot; fastest</small></span></a>
+    <a class="so" href="https://twitter.com/basithladoo" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="#000"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg><span>X<small>@basithladoo</small></span></a>
+    <button class="so" type="button" id="wa-copy" data-copy="basithladdu"><svg viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg><span>WhatsApp<small id="wa-label">copy username: basithladdu</small></span></button>
+    <a class="so" href="https://youtube.com/@basithladdu" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="#FF0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg><span>YouTube<small>@basithladdu</small></span></a>
+    <a class="so" href="mailto:basithladoo@gmail.com"><svg viewBox="0 0 24 24" fill="#EA4335"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg><span>Email<small>basithladoo@gmail.com</small></span></a>
+    <a class="so" href="https://github.com/basithladdu" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="#181717"><use href="#i-gh"/></svg><span>GitHub<small>@basithladdu</small></span></a>
+  </div>
+</section>
+
 <footer>
   <div class="strip">
-    <span class="grow">Windows only has one cursor. DuoSeat draws a second one and posts its clicks straight into the window under it.</span>
-    <a class="btn" href="https://github.com/basithladdu/duoseat">GitHub</a>
-    <a class="btn default" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe">Download</a>
+    <span class="grow">Windows only has one cursor. DuoSeat draws a second one and posts its clicks straight into the window under it. Free, MIT.</span>
+    <a class="btn" href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener"><svg fill="#181717"><use href="#i-gh"/></svg>GitHub</a>
+    <a class="btn default" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><img src="/logo.png" alt="">Download</a>
   </div>
 </footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const stage = $('stage'), wrap = $('wrap'), ca = $('ca'), cb = $('cb'), ta = $('ta'), tbx = $('tb');
+const wa = $('wa'), wb = $('wb'), wd = $('wd'), setup = $('setup');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* scale the 500x390 scene to whatever width we have */
+function fit() { const k = Math.min(1, wrap.clientWidth / 500); stage.style.transform = `scale(${k})`; wrap.style.height = 390 * k + 'px'; }
+addEventListener('resize', fit); fit();
+
+/* the scene's little clock */
+function tick() { const n = new Date(); $('clk').innerHTML = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '<br>' + n.toLocaleDateString(); }
+tick(); setInterval(tick, 15000);
+
+/* cursors */
+function move(c, x, y, ms = 650) { c.style.setProperty('--d', ms + 'ms'); c.style.left = x + 'px'; c.style.top = y + 'px'; return sleep(ms); }
+async function click(c) { c.classList.add('press'); await sleep(130); c.classList.remove('press'); await sleep(80); }
+function pos(el, dx, dy) { return [el.offsetLeft + dx, el.offsetTop + dy]; }
+
+/* visitors can be Player A: type in "your window" and B keeps going */
+let userA = false, userTimer;
+ta.addEventListener('focus', () => { userA = true; ca.classList.add('you'); wa.classList.add('ra'); });
+ta.addEventListener('input', () => { userA = true; clearTimeout(userTimer); userTimer = setTimeout(() => userA = false, 6000); });
+ta.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== ta) userA = false; }, 3000); });
+stage.addEventListener('pointermove', e => {          // while you're in the scene, the blue cursor is yours
+  if (!userA) return;
+  const r = stage.getBoundingClientRect(), k = r.width / 500;
+  ca.style.setProperty('--d', '0ms'); ca.style.left = (e.clientX - r.left) / k + 'px'; ca.style.top = (e.clientY - r.top) / k + 'px';
+});
+
+async function typeIn(box, text, perChar, who, me) {
+  for (const ch of text) {
+    if (me !== run) return;
+    if (who === 'A' && userA) return;            // you took over; A steps aside
+    box.value += ch; box.scrollTop = box.scrollHeight;
+    await sleep(perChar + Math.random() * perChar * .8);
+  }
+}
+
+/* captions + step dots (click to jump) */
+const STEPS = [
+  ['Install.', 'Same DuoSeat.exe on both laptops. No installer, it just runs.'],
+  ['Connect.', 'B types the PIN. An orange cursor shows up. Yours stays put.'],
+  ['Type at once.', 'Both of you, same second, different windows. No mix-ups.'],
+  ['Move stuff.', 'B drags his window around. Your typing doesn\'t skip a beat.'],
+  ['Click anything.', 'Minimize, restore, close. B\'s clicks only hit B\'s windows.'],
+];
+const stepsEl = $('steps');
+STEPS.forEach((s, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', 'Step ' + (i + 1)); b.onclick = () => jump(i); stepsEl.insertBefore(b, $('caption')); });
+function show(i) {
+  [...stepsEl.querySelectorAll('button')].forEach((b, j) => b.classList.toggle('on', j === i));
+  $('caption').innerHTML = `<b>${i + 1}. ${STEPS[i][0]}</b>${STEPS[i][1]}`;
+}
+
+/* the loop */
+let run = 0, startAt = 0;
+function jump(i) { startAt = i; run++; loop(run); }
+function reset() {
+  wa.style.left = '18px'; wa.style.top = '22px'; wb.style.left = '236px'; wb.style.top = '168px';
+  wd.classList.remove('min', 'on'); $('dstat').textContent = 'Waiting for Player B...'; $('tdu').classList.remove('hot');
+  wa.classList.remove('ra'); wb.classList.remove('rb'); $('balloon').classList.remove('show');
+  if (!userA) ta.value = ''; tbx.value = '';
+  setup.style.opacity = 0; setup.style.display = 'none'; $('bar').style.transition = 'none'; $('bar').style.width = '0%';
+}
+async function loop(me) {
+  while (me === run) {
+    reset();
+    for (let i = startAt; i < STEPS.length && me === run; i++) { show(i); await scene(i, me); }
+    startAt = 0;
+    await sleep(1400);
+  }
+}
+async function scene(i, me) {
+  const live = () => me === run;
+  if (i === 0) {
+    move(cb, 520, 250, 10); if (!userA) await move(ca, 120, 100, 500);
+    setup.style.display = 'block'; await sleep(30); setup.style.opacity = 1;
+    $('setupWhat').textContent = 'Adding a second cursor...'; $('setupEta').textContent = 'About 2 seconds remaining';
+    await sleep(250); const bar = $('bar'); bar.style.transition = ''; bar.style.width = '100%';
+    await sleep(1600); if (!live()) return;
+    $('setupWhat').textContent = 'Ready. Room for two.'; $('setupEta').textContent = 'Player A is waiting for Player B';
+    await sleep(900); setup.style.opacity = 0; await sleep(350); setup.style.display = 'none';
+  }
+  if (i === 1) {
+    if (!userA) move(ca, 100, 80, 700);
+    await move(cb, 420, 300, 900); if (!live()) return;
+    wd.classList.add('on'); $('dstat').textContent = 'Player B connected'; $('balloon').classList.add('show');
+    await sleep(1800); $('balloon').classList.remove('show');
+  }
+  if (i === 2) {
+    const [ax, ay] = pos(wa, 40, 50), [bx, by] = pos(wb, 40, 46);
+    await Promise.all([userA ? sleep(10) : move(ca, ax, ay, 600), move(cb, bx, by, 700)]);
+    if (!userA) { await click(ca); wa.classList.add('ra'); }
+    await click(cb); wb.classList.add('rb');
+    await Promise.all([
+      typeIn(ta, 'budget for march\nrent 12k, food 6k\nnew mouse: 0 (no need)', 55, 'A', me),
+      typeIn(tbx, 'fixing your wifi\ndon\'t touch anything\nok it works', 60, 'B', me),
+    ]);
+    await sleep(500);
+  }
+  if (i === 3) {
+    const [gx, gy] = pos(wb, 90, 10);
+    await move(cb, gx, gy, 500); if (!live()) return; await click(cb);
+    cb.style.setProperty('--d', '1100ms'); cb.style.left = gx - 140 + 'px'; cb.style.top = gy + 20 + 'px';
+    wb.style.transition = 'left 1.1s cubic-bezier(.45,.05,.3,1), top 1.1s cubic-bezier(.45,.05,.3,1)';
+    wb.style.left = wb.offsetLeft - 140 + 'px'; wb.style.top = wb.offsetTop + 20 + 'px';
+    const p = typeIn(ta, '\nwho moved that window? not me', 60, 'A', me);
+    await sleep(1200); wb.style.transition = ''; await p; await sleep(600);
+  }
+  if (i === 4) {
+    const r = $('dmin'); const [mx, my] = [wd.offsetLeft + r.offsetLeft + 10, wd.offsetTop + 9];
+    await move(cb, mx, my, 700); if (!live()) return; r.classList.add('hot'); await click(cb); r.classList.remove('hot');
+    const t = $('tdu'); wd.style.setProperty('--mx', (t.offsetLeft - wd.offsetLeft - 80) + 'px'); wd.style.setProperty('--my', (360 - wd.offsetTop - 50) + 'px');
+    wd.classList.add('min'); await sleep(600);
+    await move(cb, t.offsetLeft + 14, 368, 800); t.classList.add('hot'); await click(cb);
+    wd.classList.remove('min'); await sleep(500); t.classList.remove('hot');
+    await move(cb, 330, 250, 700); await sleep(900);
+  }
+}
+loop(++run);
+
+/* WhatsApp: copy the username, like letsfixindia.com/contact does */
+$('wa-copy').addEventListener('click', async e => {
+  const b = e.currentTarget, l = $('wa-label');
+  try { await navigator.clipboard.writeText(b.dataset.copy); b.classList.add('ok'); l.textContent = 'copied: basithladdu'; }
+  catch { l.textContent = 'username: basithladdu'; }
+  setTimeout(() => { b.classList.remove('ok'); l.textContent = 'copy username: basithladdu'; }, 2500);
+});
+</script>
 </body>
 </html>
