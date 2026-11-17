@@ -115,7 +115,7 @@ namespace DuoSeat
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(440, 300);
 
-            Label l1 = new Label { Text = "On Player B's laptop: open DuoSeat, pick Player B, connect to", Bounds = new Rectangle(14, 10, 412, 20) };
+            Label l1 = new Label { Text = "Player B connects with the DuoSeat app, or any phone/browser:", Bounds = new Rectangle(14, 10, 412, 20) };
             lblAddr.Bounds = new Rectangle(14, 30, 412, 40);
             lblAddr.Font = new Font("Consolas", 11f, FontStyle.Bold);
             lblAddr.ForeColor = Aero.Ink;
@@ -180,10 +180,15 @@ namespace DuoSeat
             {
                 string keep = cboScreen.SelectedItem == null ? null : cboScreen.SelectedItem.ToString();
                 LoadMonitors();
+                bool found = false;
                 if (keep != null)
                     for (int i = 0; i < cboScreen.Items.Count; i++)
-                        if (cboScreen.Items[i].ToString() == keep) cboScreen.SelectedIndex = i;
+                        if (cboScreen.Items[i].ToString() == keep) { cboScreen.SelectedIndex = i; found = true; }
                 ApplyArea();
+                if (keep != null && !found)
+                    lblStatus.Text = cboScreen.Items.Count == 1
+                        ? "Extra screen unplugged. Player B now shares the laptop screen (best with the browser Live view)."
+                        : "Screens changed. Player B is now on: " + cboScreen.SelectedItem;
             });
         }
 
@@ -215,7 +220,8 @@ namespace DuoSeat
                 foreach (UnicastIPAddressInformation ua in ni.GetIPProperties().UnicastAddresses)
                     if (ua.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(ua.Address.ToString());
             }
-            lblAddr.Text = ips.Count == 0 ? "(no network - connect both laptops to the same Wi-Fi)" : string.Join("   ", ips.ToArray()) + "   (or click Find)";
+            lblAddr.Text = ips.Count == 0 ? "(no network - join the same Wi-Fi)"
+                : "App:     " + ips[0] + "  (or Find)\nBrowser: http://" + ips[0] + ":" + Proto.TcpPort;
         }
 
         void LoadMonitors()
@@ -326,53 +332,100 @@ namespace DuoSeat
                 TcpClient c;
                 try { c = listener.AcceptTcpClient(); }
                 catch { return; }
-                if (activeClient != null)
-                {
-                    try { NetworkStream s0 = c.GetStream(); Proto.WriteLine(s0, "BUSY"); c.Close(); } catch { }
-                    continue;
-                }
-                activeClient = c;
-                Thread t = new Thread(delegate () { Session(c); }) { IsBackground = true, Name = "session" };
+                Thread t = new Thread(delegate () { Dispatch(c); }) { IsBackground = true, Name = "conn" };
                 t.Start();
             }
         }
 
-        void Session(TcpClient c)
+        // Same port for everything: the DuoSeat app says "DUOSEAT1 ...", a browser says "GET ...".
+        void Dispatch(TcpClient c)
         {
-            string who = ((IPEndPoint)c.Client.RemoteEndPoint).Address.ToString();
-            Injector inj = null;
             try
             {
                 c.NoDelay = true;
                 c.ReceiveTimeout = 15000;
                 NetworkStream s = c.GetStream();
-                string hello = Proto.ReadLine(s, 200);
-                string[] parts = hello.Split(new[] { ' ' }, 3);
-                if (parts.Length < 2 || parts[0] != Proto.Hello) { c.Close(); return; }
-                if (parts[1] != pin) { Proto.WriteLine(s, "BADPIN"); Status("Wrong PIN from " + who); Thread.Sleep(300); c.Close(); return; }
+                string first = Proto.ReadLine(s, 2048);
+                if (first.StartsWith("GET ")) { WebPlayer.Handle(this, c, s, first); return; }
+                Session(c, s, first);
+            }
+            catch { }
+            finally { try { c.Close(); } catch { } }
+        }
+
+        readonly object sessionLock = new object();
+        public string Pin { get { return pin; } }
+        public RECT Area { get { return area; } }
+        public Injector Active { get { return active; } }
+
+        public bool TryBegin(TcpClient c)
+        {
+            lock (sessionLock)
+            {
+                if (activeClient != null) return false;
+                activeClient = c;
+                return true;
+            }
+        }
+
+        public void Log(string s) { Status(s); }
+
+        // Called on the connection's own thread; that thread then feeds the injector.
+        public Injector StartInjector(string name, string who)
+        {
+            // the injecting thread needs its own message queue (for AttachThreadInput)
+            System.Windows.Forms.Message m; W.PeekMessage(out m, IntPtr.Zero, 0, 0, 0);
+            Injector inj = new Injector(area);
+            inj.CursorHwnd = cursor.Handle;
+            inj.BorrowMode = (bool)Invoke((Func<bool>)delegate { return cboMode.SelectedIndex == 1; });
+            inj.ModeChanged = delegate
+            {
+                BeginInvoke((Action)delegate
+                {
+                    Injector i2 = active;
+                    if (i2 == null) return;
+                    cboMode.SelectedIndex = i2.BorrowMode ? 1 : 0;
+                });
+            };
+            active = inj;
+            BeginInvoke((Action)delegate { cursor.Borrow = inj.BorrowMode; cursor.Show(); cursor.Invalidate(); });
+            inj.CenterCursor();
+            Status("Player B connected: " + name + " (" + who + ")");
+            return inj;
+        }
+
+        public void EndSession(Injector inj)
+        {
+            if (inj != null) { try { inj.ReleaseAll(); } catch { } }
+            lock (sessionLock) { active = null; activeClient = null; }
+            if (IsHandleCreated) BeginInvoke((Action)delegate { cursor.Hide(); frame.Hide(); });
+            Status("Player B disconnected. Waiting for Player B...");
+        }
+
+        // B (from the phone) picks which screen to see and use: -1 = next one
+        public RECT SwitchScreen()
+        {
+            Invoke((Action)delegate
+            {
+                int n = cboScreen.Items.Count;
+                if (n > 1) cboScreen.SelectedIndex = (cboScreen.SelectedIndex + 1) % n;
+            });
+            return area;
+        }
+
+        void Session(TcpClient c, NetworkStream s, string hello)
+        {
+            string who = ((IPEndPoint)c.Client.RemoteEndPoint).Address.ToString();
+            string[] parts = hello.Split(new[] { ' ' }, 3);
+            if (parts.Length < 2 || parts[0] != Proto.Hello) return;
+            if (parts[1] != pin) { Proto.WriteLine(s, "BADPIN"); Status("Wrong PIN from " + who); Thread.Sleep(300); return; }
+            if (!TryBegin(c)) { Proto.WriteLine(s, "BUSY"); return; }
+            Injector inj = null;
+            try
+            {
                 string name = parts.Length > 2 ? parts[2] : who;
                 Proto.WriteLine(s, "OK " + Environment.MachineName);
-
-                // the injecting thread needs its own message queue (for AttachThreadInput)
-                System.Windows.Forms.Message m; W.PeekMessage(out m, IntPtr.Zero, 0, 0, 0);
-
-                inj = new Injector(area);
-                inj.CursorHwnd = cursor.Handle;
-                inj.BorrowMode = (bool)Invoke((Func<bool>)delegate { return cboMode.SelectedIndex == 1; });
-                inj.ModeChanged = delegate
-                {
-                    BeginInvoke((Action)delegate
-                    {
-                        Injector i2 = active;
-                        if (i2 == null) return;
-                        cboMode.SelectedIndex = i2.BorrowMode ? 1 : 0;
-                    });
-                };
-                active = inj;
-                BeginInvoke((Action)delegate { cursor.Borrow = inj.BorrowMode; cursor.Show(); cursor.Invalidate(); });
-                inj.CenterCursor();
-                Status("Player B connected: " + name + " (" + who + ")");
-
+                inj = StartInjector(name, who);
                 byte[] buf = new byte[Proto.PacketSize];
                 while (Proto.ReadExact(s, buf))
                 {
@@ -381,15 +434,7 @@ namespace DuoSeat
                 }
             }
             catch (Exception) { }
-            finally
-            {
-                if (inj != null) { try { inj.ReleaseAll(); } catch { } }
-                active = null;
-                activeClient = null;
-                try { c.Close(); } catch { }
-                if (IsHandleCreated) BeginInvoke((Action)delegate { cursor.Hide(); frame.Hide(); });
-                Status("Player B disconnected. Waiting for Player B...");
-            }
+            finally { EndSession(inj); }
         }
     }
 }

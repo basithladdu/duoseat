@@ -10,7 +10,7 @@ static class TestTarget
     static void Main(string[] a)
     {
         DuoSeat.W.MakeDpiAware();
-        Form f = new Form { Text = a[0], StartPosition = FormStartPosition.Manual };
+        Form f = new Form { Text = a[0], StartPosition = FormStartPosition.Manual, TopMost = a.Length > 5 && a[5] == "top" };
         TextBox t = new TextBox { Multiline = true, Dock = DockStyle.Fill, Font = new Font("Consolas", 14f), Name = "box" };
         // shortcut handled like most apps do: by checking the Ctrl key state on key-down
         t.KeyDown += delegate (object s, KeyEventArgs e) { if (e.Control && e.KeyCode == Keys.A) { t.SelectAll(); e.SuppressKeyPress = true; } };

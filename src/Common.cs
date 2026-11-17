@@ -25,6 +25,8 @@ namespace DuoSeat
         public const byte ReleaseAll = 6; // client stopped capturing
         public const byte Ping = 7;
         public const byte Center = 8;   // put B cursor in middle of its area
+        public const byte MoveAbs = 9;  // a,b = position inside B's area, 0..10000 (touch screens)
+        public const byte Char = 10;    // a = unicode char, c = mods (1 Ctrl, 2 Alt, 4 Shift) (phone keyboards)
 
         public const int PacketSize = 13;
 
@@ -193,6 +195,8 @@ namespace DuoSeat
         [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
         [DllImport("user32.dll")] public static extern bool SetKeyboardState(byte[] s);
         [DllImport("user32.dll")] public static extern IntPtr GetKeyboardLayout(uint tid);
+        [DllImport("user32.dll")] public static extern short VkKeyScanEx(char ch, IntPtr hkl);
+        [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint code, uint type);
         [DllImport("user32.dll")] public static extern int ToUnicodeEx(uint vk, uint scan, byte[] state, [Out] StringBuilder buf, int cch, uint flags, IntPtr hkl);
         [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr h, int msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);

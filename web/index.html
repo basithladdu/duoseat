@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1c3d6e">
+<title>DuoSeat - Player B</title>
+<link rel="icon" href="/logo.png">
+<style>
+  :root { --ink:#1e3287; --bar1:#2b5797; --bar2:#16345f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:#0d1520; color:#222; font:15px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif; overflow:hidden; overscroll-behavior:none; }
+  /* ---------- login, Windows 7 dialog style ---------- */
+  #login { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:16px;
+           background:radial-gradient(ellipse at 50% 20%, #3a7bd5 0%, #1c3d6e 55%, #0d1520 100%); }
+  .dlg { width:100%; max-width:360px; background:#fff; border:1px solid #6d8fba; border-radius:7px; overflow:hidden;
+         box-shadow:0 12px 40px rgba(0,0,0,.45); }
+  .dlg .head { display:flex; gap:12px; align-items:center; padding:14px 16px;
+               background:linear-gradient(#fff,#d5e5f7); border-bottom:1px solid #9ab8de; }
+  .dlg .head img { width:44px; height:44px; }
+  .dlg h1 { margin:0; font-weight:400; font-size:21px; color:var(--ink); }
+  .dlg .sub { font-size:13px; color:#444; }
+  .dlg .body { padding:16px; }
+  .dlg label { display:block; font-size:13px; color:#333; margin-bottom:6px; }
+  .dlg input { width:100%; font:600 26px Consolas,monospace; letter-spacing:6px; text-align:center; padding:8px;
+               border:1px solid #abadb3; border-top-color:#7a7a7a; border-radius:2px; color:var(--ink); }
+  .dlg input:focus { outline:none; border-color:#3c7fb1; box-shadow:0 0 0 1px #c6e2f7; }
+  .dlg .foot { background:#f0f0f0; border-top:1px solid #dfdfdf; padding:11px 16px; display:flex; justify-content:space-between; align-items:center; }
+  .dlg .err { color:#c00; font-size:13px; min-height:18px; margin-top:8px; }
+  .btn7 { font:14px "Segoe UI",system-ui,sans-serif; padding:6px 22px; border:1px solid #707070; border-radius:3px; color:#000;
+          background:linear-gradient(#f2f2f2 0%,#ebebeb 50%,#dddddd 51%,#cfcfcf 100%); box-shadow:inset 0 0 0 1px rgba(255,255,255,.6); }
+  .btn7:active { background:linear-gradient(#e5f4fc 0%,#c4e5f6 50%,#98d1ef 51%,#68b3db 100%); border-color:#2c628b; }
+  .hint { font-size:12px; color:#666; }
+  /* ---------- app ---------- */
+  #app { position:fixed; inset:0; display:none; flex-direction:column; }
+  #stage { position:relative; flex:1; overflow:hidden; background:#000; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #screen { position:absolute; left:0; top:0; transform-origin:0 0; image-rendering:auto; pointer-events:none; }
+  #pad { position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:10px;
+         background:repeating-linear-gradient(45deg,#18263a 0 18px,#1b2b42 18px 36px); color:#9fb6d6; font-size:14px; text-align:center; padding:20px; }
+  #pad b { color:#fff; font-size:18px; font-weight:600; }
+  #status { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.65); color:#fff; padding:5px 12px;
+            border-radius:12px; font-size:12.5px; pointer-events:none; transition:opacity .4s; white-space:nowrap; }
+  /* toolbar: Windows 7 taskbar vibes */
+  #bar { display:flex; gap:5px; padding:6px 6px calc(6px + env(safe-area-inset-bottom)); overflow-x:auto; scrollbar-width:none;
+         background:linear-gradient(#3d6fae 0%,var(--bar1) 45%,var(--bar2) 46%,#0f2747 100%); border-top:1px solid #8fb3e3; }
+  #bar::-webkit-scrollbar { display:none; }
+  .k { flex:0 0 auto; min-width:42px; height:38px; padding:0 10px; border-radius:4px; color:#fff; font:600 13.5px "Segoe UI",system-ui,sans-serif;
+       border:1px solid rgba(0,0,0,.55); box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+       background:linear-gradient(rgba(255,255,255,.28) 0%,rgba(255,255,255,.08) 50%,rgba(0,0,0,.08) 51%,rgba(255,255,255,.12) 100%); }
+  .k:active, .k.on { background:linear-gradient(#ffd56a 0%,#f0a92a 50%,#e38a00 51%,#f7b84a 100%); color:#2b1600; }
+  .k.seg { min-width:54px; }
+  .sep { flex:0 0 1px; background:rgba(255,255,255,.25); margin:4px 2px; }
+  #kb { position:fixed; left:0; bottom:0; width:2px; height:2px; opacity:0; border:0; padding:0; font-size:16px; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="dlg">
+    <div class="head"><img src="/logo.png" alt=""><div><h1>Player B</h1><div class="sub">Your own cursor on Player A's PC.</div></div></div>
+    <div class="body">
+      <label for="pin">PIN shown on Player A's screen</label>
+      <input id="pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="----">
+      <div class="err" id="err"></div>
+    </div>
+    <div class="foot"><span class="hint">Tip: turn your phone sideways.</span><button class="btn7" id="go">Connect</button></div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="stage">
+    <img id="screen" alt="">
+    <div id="pad"><b>Touchpad</b>Look at the screen and slide here.<br>Tap = click &middot; two-finger tap = right-click<br>two-finger slide = scroll &middot; tap, then hold + slide = drag</div>
+    <div id="status">Connecting...</div>
+  </div>
+  <div id="bar">
+    <button class="k seg on" id="mLive">Live</button>
+    <button class="k seg" id="mPad">Pad</button>
+    <span class="sep"></span>
+    <button class="k" id="bKb">&#9000; Keys</button>
+    <button class="k" data-vk="27">Esc</button>
+    <button class="k" data-vk="9">Tab</button>
+    <button class="k" id="bCtrl" data-mod="1">Ctrl</button>
+    <button class="k" id="bAlt" data-mod="2">Alt</button>
+    <button class="k" id="bShift" data-mod="4">Shift</button>
+    <button class="k" data-vk="37">&larr;</button>
+    <button class="k" data-vk="38">&uarr;</button>
+    <button class="k" data-vk="40">&darr;</button>
+    <button class="k" data-vk="39">&rarr;</button>
+    <button class="k" data-vk="46">Del</button>
+    <span class="sep"></span>
+    <button class="k" id="bRight">Right-click</button>
+    <button class="k" id="bFit">Fit</button>
+    <button class="k" id="bScreen">Screen &#8635;</button>
+  </div>
+</div>
+<textarea id="kb" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const stage = $('stage'), img = $('screen'), pad = $('pad'), statusEl = $('status'), kb = $('kb');
+let ws = null, pin = '', mode = 'live', mods = 0, W = 1920, H = 1080, alive = false, retry = null;
+let zoom = 1, tx = 0, ty = 0, fitW = 0, fitH = 0, fitX = 0, fitY = 0, lastUrl = null;
+
+/* ---------------- connection ---------------- */
+function send(s) { if (ws && ws.readyState === 1) ws.send(s); }
+function say(t, sticky) {
+  statusEl.textContent = t; statusEl.style.opacity = 1;
+  clearTimeout(say.t); if (!sticky) say.t = setTimeout(() => statusEl.style.opacity = 0, 2200);
+}
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.binaryType = 'blob';
+  ws.onopen = () => send('p ' + pin);
+  ws.onmessage = e => {
+    if (typeof e.data !== 'string') {
+      const url = URL.createObjectURL(e.data);
+      img.onload = () => { if (lastUrl) URL.revokeObjectURL(lastUrl); lastUrl = url; if (!fitW) layout(); send('f'); };
+      img.src = url; return;
+    }
+    const p = e.data.split(' ');
+    if (p[0] === 'ok') {
+      W = +p[1]; H = +p[2]; alive = true;
+      try { localStorage.setItem('duoseat-pin', pin); } catch (_) {}
+      $('login').style.display = 'none'; $('app').style.display = 'flex';
+      fitW = 0; setMode(mode); say('Connected. Your cursor is the orange one.');
+    } else if (p[0] === 'bad') { $('err').textContent = 'Wrong PIN. Check Player A\'s screen.'; alive = false; ws.close(); }
+    else if (p[0] === 'busy') { $('err').textContent = 'Another Player B is already connected.'; alive = false; ws.close(); }
+    else if (p[0] === 'mode') say(p[1] === '1' ? 'Borrow mode' : 'Shared mode');
+  };
+  ws.onclose = () => {
+    if (!alive) return;
+    say('Lost Player A. Reconnecting...', true);
+    clearTimeout(retry); retry = setTimeout(connect, 2000);
+  };
+}
+$('go').onclick = () => {
+  pin = $('pin').value.trim(); if (!pin) return;
+  $('err').textContent = ''; alive = true; connect();
+};
+$('pin').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+try { $('pin').value = localStorage.getItem('duoseat-pin') || ''; } catch (_) {}
+setInterval(() => send('.'), 10000);   // keep-alive while idle
+
+/* ---------------- modes ---------------- */
+function setMode(m) {
+  mode = m;
+  $('mLive').classList.toggle('on', m === 'live'); $('mPad').classList.toggle('on', m === 'pad');
+  img.style.display = m === 'live' ? 'block' : 'none';
+  pad.style.display = m === 'pad' ? 'flex' : 'none';
+  send(m === 'live' ? 's 1' : 's 0');
+}
+tapBtn($('mLive'), () => setMode('live'));
+tapBtn($('mPad'), () => setMode('pad'));
+
+/* ---------------- live view geometry ---------------- */
+function layout() {
+  const r = stage.getBoundingClientRect(), iw = img.naturalWidth || W, ih = img.naturalHeight || H;
+  const s = Math.min(r.width / iw, r.height / ih);
+  fitW = iw * s; fitH = ih * s; fitX = (r.width - fitW) / 2; fitY = (r.height - fitH) / 2;
+  img.style.width = fitW + 'px'; img.style.height = fitH + 'px';
+  apply();
+}
+function apply() {
+  if (zoom <= 1.001) { zoom = 1; tx = 0; ty = 0; }
+  // keep the zoomed picture covering the area it had when it was fitted
+  tx = Math.min(0, Math.max(fitW - fitW * zoom, tx));
+  ty = Math.min(0, Math.max(fitH - fitH * zoom, ty));
+  img.style.transform = `translate(${fitX + tx}px,${fitY + ty}px) scale(${zoom})`;
+}
+addEventListener('resize', () => { fitW = 0; layout(); });
+function norm(x, y) {               // stage coords -> 0..10000 inside B's screen
+  const nx = (x - fitX - tx) / (fitW * zoom), ny = (y - fitY - ty) / (fitH * zoom);
+  return [Math.round(Math.max(0, Math.min(1, nx)) * 10000), Math.round(Math.max(0, Math.min(1, ny)) * 10000)];
+}
+tapBtn($('bFit'), () => { zoom = 1; apply(); });
+
+/* ---------------- touch / mouse ---------------- */
+const pts = new Map();
+let g = null;       // current gesture
+function sp(e) { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+function click(btn) { send('b ' + btn + ' 1'); send('b ' + btn + ' 0'); }
+let lastTap = { t: 0, x: 0, y: 0, n: null };
+
+stage.addEventListener('pointerdown', e => {
+  stage.setPointerCapture(e.pointerId);
+  const p = sp(e); pts.set(e.pointerId, p);
+  if (e.pointerType === 'mouse') { mouseDown(e, p); return; }
+  if (pts.size === 1) {
+    const now = performance.now();
+    g = { kind: 'one', start: p, last: p, t0: now, moved: false, long: false, drag: false,
+          padDrag: mode === 'pad' && now - lastTap.end < 260 };
+    if (g.padDrag) send('b 0 1');
+    if (mode === 'live') g.timer = setTimeout(() => { if (!g.moved) { g.long = true; const n = norm(p.x, p.y); send('a ' + n[0] + ' ' + n[1]); click(1); say('Right-click'); } }, 550);
+  } else if (pts.size === 2) {
+    if (g && g.timer) clearTimeout(g.timer);
+    if (g && g.drag) send('b 0 0');
+    if (g && g.padDrag) send('b 0 0');
+    const [a, b] = [...pts.values()];
+    g = { kind: 'two', d0: dist(a, b), c0: mid(a, b), lastC: mid(a, b), z0: zoom, tx0: tx, ty0: ty, t0: performance.now(), how: null, acc: 0 };
+  }
+});
+stage.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) { if (e.pointerType === 'mouse' && mode === 'live') hover(sp(e)); return; }
+  const p = sp(e); pts.set(e.pointerId, p);
+  if (e.pointerType === 'mouse') { mouseMove(p); return; }
+  if (!g) return;
+  if (g.kind === 'one') {
+    if (!g.moved && dist(p, g.start) > 9) { g.moved = true; clearTimeout(g.timer); }
+    if (!g.moved || g.long) return;
+    if (mode === 'pad') {
+      const k = 1.9; send('m ' + Math.round((p.x - g.last.x) * k) + ' ' + Math.round((p.y - g.last.y) * k));
+    } else {
+      if (!g.drag) { const n = norm(g.start.x, g.start.y); send('a ' + n[0] + ' ' + n[1]); send('b 0 1'); g.drag = true; }
+      const n = norm(p.x, p.y); send('a ' + n[0] + ' ' + n[1]);
+    }
+    g.last = p;
+  } else if (g.kind === 'two' && pts.size === 2) {
+    const [a, b] = [...pts.values()], d = dist(a, b), c = mid(a, b);
+    if (!g.how) {
+      if (mode === 'live' && Math.abs(d - g.d0) > 22) g.how = 'zoom';
+      else if (dist(c, g.c0) > 12) { g.how = 'scroll'; if (mode === 'live') { const n = norm(c.x, c.y); send('a ' + n[0] + ' ' + n[1]); } }
+    }
+    if (g.how === 'zoom') {
+      zoom = Math.max(1, Math.min(6, g.z0 * d / g.d0));
+      const px = (g.c0.x - fitX - g.tx0) / g.z0, py = (g.c0.y - fitY - g.ty0) / g.z0;   // content point under fingers
+      tx = c.x - fitX - px * zoom; ty = c.y - fitY - py * zoom; apply();
+    } else if (g.how === 'scroll') {
+      g.acc += c.y - g.lastC.y;
+      while (g.acc > 28) { send('w 120 0'); g.acc -= 28; }
+      while (g.acc < -28) { send('w -120 0'); g.acc += 28; }
+    }
+    g.lastC = c;
+  }
+});
+function endPointer(e) {
+  if (!pts.has(e.pointerId)) return;
+  const p = sp(e); pts.delete(e.pointerId);
+  if (e.pointerType === 'mouse') { mouseUp(e, p); return; }
+  if (!g) return;
+  const now = performance.now();
+  if (g.kind === 'one' && pts.size === 0) {
+    clearTimeout(g.timer);
+    if (g.padDrag) { send('b 0 0'); lastTap.end = 0; }
+    else if (g.drag) { const n = norm(p.x, p.y); send('a ' + n[0] + ' ' + n[1]); send('b 0 0'); }
+    else if (!g.moved && !g.long) {
+      if (mode === 'live') {
+        let n = norm(p.x, p.y);
+        // second tap of a double-tap lands exactly on the first one
+        if (now - lastTap.t < 400 && dist(p, lastTap) < 28 && lastTap.n) n = lastTap.n;
+        send('a ' + n[0] + ' ' + n[1]); click(0);
+        lastTap = { t: now, x: p.x, y: p.y, n: n, end: now };
+      } else { click(0); lastTap = { t: now, x: p.x, y: p.y, n: null, end: now }; }
+    }
+    g = null;
+  } else if (g.kind === 'two' && pts.size === 0) {
+    if (!g.how && now - g.t0 < 300) { click(1); say('Right-click'); }   // two-finger tap
+    g = null;
+  }
+}
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('contextmenu', e => e.preventDefault());
+
+/* real mouse (Player B on a laptop browser) */
+let mDown = false;
+function hover(p) { if (mode !== 'live') return; const n = norm(p.x, p.y); send('a ' + n[0] + ' ' + n[1]); }
+function mouseDown(e, p) {
+  e.preventDefault(); kbFocusIfDesktop();
+  if (mode === 'live') hover(p); else pad.lastM = p;
+  const b = e.button === 2 ? 1 : e.button === 1 ? 2 : e.button === 3 ? 3 : e.button === 4 ? 4 : 0;
+  mDown = true; send('b ' + b + ' 1'); pad.mb = b;
+}
+function mouseMove(p) {
+  if (mode === 'live') hover(p);
+  else if (pad.lastM) { send('m ' + Math.round(p.x - pad.lastM.x) + ' ' + Math.round(p.y - pad.lastM.y)); pad.lastM = p; }
+}
+function mouseUp(e, p) { if (mode === 'live') hover(p); send('b ' + (pad.mb || 0) + ' 0'); mDown = false; pad.lastM = null; }
+stage.addEventListener('wheel', e => { e.preventDefault(); if (mode === 'live') hover(sp(e)); send('w ' + (e.deltaY > 0 ? -120 : 120) + ' 0'); }, { passive: false });
+
+/* ---------------- keyboard ---------------- */
+const SENT = ' ';
+let prev = SENT, composing = false;
+kb.value = SENT;
+function oneShot() { if (mods) { mods = 0; ['bCtrl', 'bAlt', 'bShift'].forEach(id => $(id).classList.remove('on')); } }
+function sendChar(ch) {
+  if (ch === '\n') { send('k 13 ' + mods); oneShot(); return; }
+  send('c ' + ch.codePointAt(0) + ' ' + mods); oneShot();
+}
+function sendVk(vk) { send('k ' + vk + ' ' + mods); oneShot(); }
+kb.addEventListener('compositionstart', () => composing = true);
+kb.addEventListener('compositionend', () => { composing = false; resetKb(); });
+kb.addEventListener('input', () => {
+  const v = kb.value; let i = 0;
+  while (i < prev.length && i < v.length && prev[i] === v[i]) i++;
+  for (let d = prev.length - i; d > 0; d--) sendVk(8);
+  for (const ch of v.slice(i)) sendChar(ch);
+  prev = v; resetKb();
+});
+function resetKb() { if (!composing && (kb.value.length === 0 || kb.value.length > 60 || kb.value.includes('\n'))) { kb.value = SENT; prev = SENT; } }
+const SPECIAL = { Enter: 13, Backspace: 8, Tab: 9, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+  Delete: 46, Home: 36, End: 35, PageUp: 33, PageDown: 34, Insert: 45,
+  F1: 112, F2: 113, F3: 114, F4: 115, F5: 116, F6: 117, F7: 118, F8: 119, F9: 120, F10: 121, F11: 122, F12: 123 };
+document.addEventListener('keydown', e => {
+  if ($('app').style.display !== 'flex') return;
+  const m = (e.ctrlKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.shiftKey ? 4 : 0);
+  if (SPECIAL[e.key] !== undefined && !(e.key === 'Backspace' && document.activeElement === kb && !e.ctrlKey && !e.altKey)) {
+    if (e.key === 'Enter' && document.activeElement === kb && !e.ctrlKey && !e.altKey) return; // textarea sends it
+    e.preventDefault(); send('k ' + SPECIAL[e.key] + ' ' + (m | mods)); oneShot(); return;
+  }
+  if ((e.ctrlKey || e.altKey) && e.key.length === 1) {     // shortcuts from a real keyboard
+    e.preventDefault(); send('c ' + e.key.codePointAt(0) + ' ' + (m & 3)); return;
+  }
+  if (document.activeElement !== kb && e.key.length === 1) { e.preventDefault(); sendChar(e.key); }
+});
+function kbFocusIfDesktop() { if (matchMedia('(pointer:fine)').matches) kb.focus({ preventScroll: true }); }
+tapBtn($('bKb'), () => { if (document.activeElement === kb) kb.blur(); else kb.focus(); });
+
+/* ---------------- toolbar ---------------- */
+function tapBtn(el, fn) {
+  el.addEventListener('pointerdown', e => e.preventDefault());   // keep the phone keyboard open
+  el.addEventListener('click', e => { e.preventDefault(); fn(); });
+}
+document.querySelectorAll('[data-vk]').forEach(b => tapBtn(b, () => sendVk(+b.dataset.vk)));
+document.querySelectorAll('[data-mod]').forEach(b => tapBtn(b, () => { mods ^= +b.dataset.mod; b.classList.toggle('on', !!(mods & +b.dataset.mod)); }));
+tapBtn($('bRight'), () => { click(1); say('Right-click'); });
+tapBtn($('bScreen'), () => { send('n'); zoom = 1; fitW = 0; say('Switched screen'); });
+</script>
+</body>
+</html>

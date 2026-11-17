@@ -78,6 +78,14 @@ namespace DuoSeat
                     case Proto.Mode: BorrowMode = !BorrowMode; if (ModeChanged != null) ModeChanged(); break;
                     case Proto.ReleaseAll: ReleaseAll(); break;
                     case Proto.Center: CenterCursor(); break;
+                    case Proto.MoveAbs:
+                        {
+                            int x = Area.Left + (int)((long)Math.Max(0, Math.Min(10000, a)) * (Area.Width - 1) / 10000);
+                            int y = Area.Top + (int)((long)Math.Max(0, Math.Min(10000, b)) * (Area.Height - 1) / 10000);
+                            OnMove(x - bx, y - by);
+                            break;
+                        }
+                    case Proto.Char: TypeChar(a, c); break;
                 }
             }
             catch (Exception) { /* never let one bad event kill the session */ }
@@ -411,6 +419,7 @@ namespace DuoSeat
                 if (chars.Length > 0 && chars[0] >= 0x20)
                 {
                     charOnly[vk] = true;
+                    Settle(target);
                     foreach (char ch in chars)
                         W.PostMessage(target, W.WM_CHAR, new IntPtr(ch), new IntPtr(lp));
                     return;
@@ -423,6 +432,7 @@ namespace DuoSeat
             {
                 // synced: B's app sees B's own Ctrl/Shift/Alt, so shortcuts behave like real typing
                 W.PostMessage(target, kmsg, new IntPtr(msgVk), new IntPtr(lp));
+                if (down && Translate(vk, scan, target).Length > 0) pendingTranslate = target;
                 return;
             }
             // B's window belongs to the same app Player A is typing in (e.g. both in Chrome).
@@ -432,6 +442,19 @@ namespace DuoSeat
         }
 
         readonly bool[] charOnly = new bool[256];
+
+        // An Enter/Backspace/Tab key-down becomes a character only when B's app gets to it
+        // (TranslateMessage). Characters we post directly must not overtake it.
+        IntPtr pendingTranslate;
+        void Settle(IntPtr target)
+        {
+            if (pendingTranslate == IntPtr.Zero) return;
+            WaitIdle(pendingTranslate);
+            W.SendTimeout(pendingTranslate, W.WM_NULL, IntPtr.Zero, IntPtr.Zero);
+            Thread.Sleep(8);
+            W.SendTimeout(pendingTranslate, W.WM_NULL, IntPtr.Zero, IntPtr.Zero);
+            pendingTranslate = IntPtr.Zero;
+        }
 
         void BorrowedShortcut(IntPtr target, int kmsg, int msgVk, int lp)
         {
@@ -457,6 +480,43 @@ namespace DuoSeat
             }
             finally { W.AttachThreadInput(myThread, tid, false); }
         }
+
+        // Phone keyboards send finished text, not key presses.
+        void TypeChar(int code, int mods)
+        {
+            if (code == '\n' || code == '\r') { Tap(0x0D, mods); return; }
+            if (code == '\b') { Tap(0x08, mods); return; }
+            if (code == '\t') { Tap(0x09, mods); return; }
+            if (code < 0x20) return;
+            if (mods == 0)
+            {
+                IntPtr target = ResolveFocus();
+                if (target == IntPtr.Zero) return;
+                string s;
+                try { s = char.ConvertFromUtf32(code); } catch { return; }
+                Settle(target);
+                foreach (char ch in s) W.PostMessage(target, W.WM_CHAR, new IntPtr(ch), new IntPtr(1));
+                return;
+            }
+            if (code > 0xFFFF) return;
+            short r = W.VkKeyScanEx((char)code, W.GetKeyboardLayout(W.ThreadOf(bTop)));
+            if (r == -1) return;
+            if (((r >> 8) & 1) != 0) mods |= 4;
+            Tap(r & 0xFF, mods);
+        }
+
+        // press + release one key, with Ctrl/Alt/Shift held around it
+        public void Tap(int vk, int mods)
+        {
+            int[] mv = { W.VK_LCONTROL, W.VK_LMENU, W.VK_LSHIFT };
+            for (int i = 0; i < 3; i++) if ((mods & (1 << i)) != 0) OnKey(mv[i], ScanOf(mv[i]), false, true);
+            OnKey(vk, ScanOf(vk), IsExtended(vk), true);
+            OnKey(vk, ScanOf(vk), IsExtended(vk), false);
+            for (int i = 2; i >= 0; i--) if ((mods & (1 << i)) != 0) OnKey(mv[i], ScanOf(mv[i]), false, false);
+        }
+
+        public static int ScanOf(int vk) { return (int)W.MapVirtualKey((uint)vk, 0); }
+        public static bool IsExtended(int vk) { return (vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E || vk == W.VK_LWIN || vk == W.VK_RWIN || vk == W.VK_RCONTROL || vk == W.VK_RMENU; }
 
         void Fold()
         {

@@ -26,11 +26,28 @@ DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both w
 
 <p align="center"><img src="docs/choose.png" width="300"> <img src="docs/player-a.png" width="270"> <img src="docs/player-b.png" width="270"></p>
 
+## No app? Use a browser (phone works)
+
+Player A's window shows a link like `http://192.168.0.106:47800`. Open it on any phone, tablet or laptop on the same Wi-Fi and type the PIN. That's it, nothing to install.
+
+- **Live**: you see B's screen and tap right on it. Pinch to zoom, two fingers to scroll, long-press to right-click.
+- **Pad**: the phone turns into a touchpad while you look at the TV. Lower lag, no video.
+- **Keys**: brings up the phone keyboard. Esc, Tab, Ctrl, Alt, arrows are on the bar.
+
+Unlike Chrome Remote Desktop, it doesn't steal the one real cursor. You still get your own.
+
+**No TV / no HDMI?** Fine. Player B just shares the laptop screen and watches it in **Live**. Pull the HDMI mid-session and B's cursor hops to the laptop screen on its own.
+
+**Working together:** the live view draws both cursors, A in blue and B in orange, so you can see what the other one is pointing at. **Screen ↻** flips B between the TV and the laptop screen.
+
+<p align="center"><img src="docs/browser.png" width="260"></p>
+
 ## How it works (the jargon, decoded)
 
 Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight over them. We go around them.
 
 - **Low-level hooks** (`WH_MOUSE_LL`, `WH_KEYBOARD_LL`) on B's laptop: his mouse and keys get caught before his own Windows sees them, then shipped over **TCP** (port 47800, PIN handshake, 13-byte packets).
+- **Same port, browser flavour**: a browser says `GET`, so DuoSeat serves one page and upgrades to a **WebSocket**. The screen goes out as **JPEG frames**, one per ack, so a slow phone never builds a backlog.
 - **Layered, click-through, topmost window** on A's PC: that's the orange cursor. It's just a picture. The real cursor stays yours.
 - **`PostMessage`**: B's clicks, scrolls and keys go straight into the window under the orange cursor. The real mouse never moves.
 - **`AttachThreadInput` + `SetKeyboardState`**: B's Ctrl/Shift/Alt are lent to B's app only, so his Ctrl+C doesn't press your Ctrl.
@@ -39,11 +56,12 @@ Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight
 
 ## Honest list
 
-- ✅ **Tested:** both typing at the same moment (A's 120+ keys and B's text, zero mix-ups), browsers (Edge), regular Windows text boxes, Shift/Ctrl+A/Tab/Enter, dragging windows by the title bar.
+- ✅ **Tested:** both typing at the same moment (A's 120+ keys and B's text, zero mix-ups), browsers (Edge), regular Windows text boxes, Shift/Ctrl+A/Tab/Enter/Backspace, dragging windows by the title bar, the browser Player B from a desktop browser (live view, clicks, typing, auto-reconnect).
+- 🟡 **Not yet on a real phone:** the touch gestures (tap, pinch, two-finger scroll) are written but not yet tried on an actual phone. Found a quirk? Open an issue.
 - 🟡 **Borrow blink:** taskbar, Start, context menus, Settings and Store apps. You'll see your cursor twitch for a few ms.
 - 🟡 **Same app for both** (you're both in Chrome): typing is fine; B's shortcuts borrow your keyboard state for about 40 ms. Different apps is the smoothest.
 - ❌ **Nope:** games (raw input), admin windows (unless DuoSeat runs as admin), UAC and lock screens, and there's one clipboard (Windows only has one).
-- 🔒 PIN-protected, local network only, no accounts, no internet, no telemetry. Not encrypted, so use it on your home Wi-Fi, not café Wi-Fi.
+- 🔒 PIN-protected, local network only, no accounts, no internet, no telemetry. Not encrypted (keys and the live picture), so use it on your home Wi-Fi, not café Wi-Fi.
 
 ## Build it yourself
 
@@ -61,6 +79,7 @@ That gives you `dist\DuoSeat.exe`.
 | `src/Host.cs` | Player A window, network listener, orange cursor |
 | `src/Injector.cs` | the magic: turns B's input into a second cursor and keyboard |
 | `src/Client.cs` | Player B: hooks, capture, auto-reconnect |
+| `src/Web.cs` + `web/index.html` | Player B in a browser: tiny HTTP + WebSocket server, JPEG live view |
 | `src/Aero.cs` | the Windows 7 look |
 | `src/Common.cs` | protocol and Win32 imports |
 
