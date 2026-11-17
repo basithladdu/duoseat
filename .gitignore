@@ -1,0 +1,6 @@
+dist/
+*.exe
+*.pdb
+test/*.log
+test/script-*.txt
+test/page.html
