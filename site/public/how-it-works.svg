@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="'Segoe Print','Comic Sans MS','Chalkboard SE','Bradley Hand',cursive">
+  <defs>
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" scale="3.2"/>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9" fill="none" stroke="#333" stroke-width="1.6" stroke-linecap="round"/>
+    </marker>
+  </defs>
+  <rect width="900" height="440" fill="#fffdf6"/>
+
+  <g filter="url(#rough)" stroke="#333" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Player B's laptop -->
+    <rect x="40" y="250" width="190" height="115" rx="8" fill="#e8f1ff"/>
+    <path d="M20 372 L250 372 L236 392 L34 392 Z" fill="#e8f1ff"/>
+    <!-- B's mouse -->
+    <path d="M285 345 q0 -30 22 -30 q22 0 22 30 q0 28 -22 28 q-22 0 -22 -28 Z" fill="#e8f1ff"/>
+    <line x1="307" y1="315" x2="307" y2="333"/>
+
+    <!-- Player A's laptop -->
+    <rect x="610" y="250" width="190" height="115" rx="8" fill="#fff1e0"/>
+    <path d="M590 372 L820 372 L806 392 L604 392 Z" fill="#fff1e0"/>
+
+    <!-- the TV / extra monitor -->
+    <rect x="420" y="30" width="300" height="170" rx="10" fill="#fff1e0"/>
+    <line x1="570" y1="200" x2="570" y2="222"/>
+    <line x1="535" y1="224" x2="605" y2="224"/>
+
+    <!-- HDMI cable -->
+    <path d="M700 250 C 720 220, 690 215, 700 200" stroke-dasharray="6 6"/>
+
+    <!-- wifi arrow B -> A -->
+    <path d="M240 300 C 360 250, 470 340, 600 300" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- cursors -->
+  <g stroke="#fff" stroke-width="2" stroke-linejoin="round">
+    <path d="M500 80 l0 34 l9 -8 l6 14 l7 -3 l-6 -13 l12 0 z" fill="#ff8c00"/>
+    <path d="M640 270 l0 34 l9 -8 l6 14 l7 -3 l-6 -13 l12 0 z" fill="#0078d7"/>
+  </g>
+
+  <g fill="#222" font-size="19">
+    <text x="62" y="285">Player B</text>
+    <text x="62" y="312" font-size="15" fill="#555">runs DuoSeat,</text>
+    <text x="62" y="332" font-size="15" fill="#555">mouse + keys get</text>
+    <text x="62" y="352" font-size="15" fill="#555">beamed over Wi-Fi</text>
+
+    <text x="630" y="336">Player A</text>
+    <text x="630" y="356" font-size="14" fill="#555">has the files</text>
+
+    <text x="440" y="140" font-size="16" fill="#ff8c00">B's own cursor</text>
+    <text x="440" y="162" font-size="15" fill="#555">(the TV is B's screen)</text>
+    <text x="672" y="285" font-size="15" fill="#0078d7">A's cursor,</text>
+    <text x="672" y="303" font-size="15" fill="#0078d7">untouched</text>
+
+    <text x="330" y="258" font-size="16">TCP, port 47800</text>
+    <text x="330" y="278" font-size="13" fill="#555">(PIN first, then 13-byte packets)</text>
+
+    <text x="726" y="232" font-size="13" fill="#555">HDMI</text>
+
+    <text x="40" y="60" font-size="24">one PC, two people,</text>
+    <text x="40" y="90" font-size="24">zero cursor fights.</text>
+    <text x="40" y="128" font-size="14" fill="#555">B's clicks + keys are posted straight</text>
+    <text x="40" y="148" font-size="14" fill="#555">into B's window (PostMessage), so A's</text>
+    <text x="40" y="168" font-size="14" fill="#555">real cursor and keyboard focus never move.</text>
+  </g>
+</svg>
