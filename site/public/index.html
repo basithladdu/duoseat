@@ -4,716 +4,140 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DuoSeat</title>
-<meta name="description" content="Two people, one Windows PC, two cursors, two keyboards. Free and open source.">
+<meta name="description" content="Two people, one Windows PC. Each gets their own cursor and keyboard. Free and open source.">
 <meta property="og:title" content="DuoSeat">
 <meta property="og:description" content="Hand someone a cursor, not your laptop.">
 <meta property="og:image" content="https://duoseat.wedevit.in/logo.png">
-<meta name="theme-color" content="#0b3a80">
+<meta name="theme-color" content="#d5e5f7">
 <link rel="icon" href="/favicon.ico">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/7.css@0.21.1/dist/7.css">
 <style>
+  /* Same look as the DuoSeat app itself (src/Aero.cs): header band, white body, grey footer strip,
+     command links with the green arrow, glossy push buttons. */
   :root {
-    --b: #ff8c00; --a: #0078d7; --g: #0bd82c; --g-dark: #2b9d2b;
+    --ink: #1e3287;        /* app heading blue */
+    --link-ink: #151c55;   /* command link heading */
+    --note: #444;
+    --b: #ff8c00;          /* Player B's cursor */
+    --a: #0078d7;          /* Player A's cursor */
     --font: "Segoe UI", "Noto Sans", Tahoma, sans-serif;
-    --tb: 40px;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    font: 9pt var(--font); overflow: hidden; color: #222; user-select: none; -webkit-user-select: none;
-    background:
-      conic-gradient(from 196deg at 46% 46%, transparent 0deg, #ffffff1c 3deg, transparent 9deg, transparent 22deg, #9fe0ff22 25deg, transparent 33deg, transparent 300deg, #ffffff14 304deg, transparent 312deg),
-      radial-gradient(ellipse 60% 40% at 30% 70%, #7fd3ff33, transparent 70%),
-      radial-gradient(ellipse 50% 55% at 46% 46%, #bfe9ff 0, #5fb4f0 13%, #1e6fc8 33%, #0b3a80 62%, #061a3d 100%);
-    background-color: #0a2a5e;
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 var(--font); color: #222; background: #fff; display: flex; flex-direction: column; min-height: 100vh; }
+  a { color: #0066cc; }
+  a:hover { color: #3399ff; }
+
+  /* header band */
+  header { background: linear-gradient(#ffffff, #d5e5f7); border-bottom: 1px solid #9ab8de; }
+  .band { max-width: 1040px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
+  .band img { width: 56px; height: 56px; }
+  .band h1 { margin: 0; font: 400 28px var(--font); color: var(--ink); line-height: 1.1; }
+  .band p { margin: 3px 0 0; color: var(--note); }
+  .band .ver { margin-left: auto; color: #666; font-size: 12px; text-align: right; }
+
+  /* body */
+  main { flex: 1; max-width: 1040px; width: 100%; margin: 0 auto; padding: 30px 24px 26px; display: grid; grid-template-columns: minmax(0, 1fr) 470px; gap: 40px; align-items: start; }
+  .lead { font: 400 24px/1.3 var(--font); color: var(--ink); margin: 2px 0 10px; }
+  .lead .b { color: var(--b); }
+  .intro { color: #333; margin: 0 0 18px; max-width: 470px; }
+
+  /* command links, exactly like the app's "I'm Player A / I'm Player B" */
+  .cl { display: grid; grid-template-columns: 30px 1fr; gap: 0 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 3px; color: inherit; text-decoration: none; margin: 0 -12px 4px; }
+  .cl:hover, .cl:focus-visible { background: linear-gradient(#f7fbff, #e5f3fb); border-color: #c6e2f7; color: inherit; outline: none; }
+  .cl svg { width: 22px; height: 22px; margin-top: 3px; }
+  .cl b { display: block; font: 400 17px var(--font); color: var(--link-ink); }
+  .cl span { color: var(--note); font-size: 13px; }
+
+  .keys { margin-top: 18px; font-size: 12.5px; color: #555; border-top: 1px solid #e5e5e5; padding-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; }
+  kbd { font: 12px var(--font); background: linear-gradient(#fdfdfd, #ececec); border: 1px solid #b5b5b5; border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
+
+  /* the real app windows, stacked like they'd sit on a desktop */
+  .shots { position: relative; height: 430px; }
+  .shots img { position: absolute; border-radius: 7px 7px 0 0; box-shadow: 0 8px 26px #0003, 0 1px 3px #0003; border: 1px solid #7895b8; background: #fff; }
+  .shots .s1 { width: 300px; left: 0; top: 0; z-index: 1; }
+  .shots .s2 { width: 290px; right: 0; top: 70px; z-index: 2; }
+  .shots .s3 { width: 290px; left: 40px; top: 220px; z-index: 3; }
+  .tagb, .taga { position: absolute; z-index: 4; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px 2px 4px; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px #0003; }
+  .tagb { color: var(--b); right: 6px; top: 46px; }
+  .taga { color: var(--a); left: 26px; top: 196px; }
+  .tagb svg, .taga svg { width: 14px; height: 17px; }
+
+  /* footer strip, like the app's grey button bar */
+  footer { background: #f0f0f0; border-top: 1px solid #dfdfdf; }
+  .strip { max-width: 1040px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 8px; color: #555; font-size: 12.5px; flex-wrap: wrap; }
+  .strip .grow { flex: 1; }
+  .btn { display: inline-block; font: 13px var(--font); color: #000; text-decoration: none; padding: 5px 18px; border: 1px solid #707070; border-radius: 3px;
+    background: linear-gradient(#f2f2f2 0%, #ebebeb 50%, #dddddd 51%, #cfcfcf 100%); box-shadow: inset 0 0 0 1px #ffffffaa; }
+  .btn:hover { color: #000; border-color: #3c7fb1; background: linear-gradient(#eaf6fd 0%, #d9f0fc 50%, #bee6fd 51%, #a7d9f5 100%); }
+  .btn:active { border-color: #2c628b; background: linear-gradient(#e5f4fc 0%, #c4e5f6 50%, #98d1ef 51%, #68b3db 100%); }
+  .btn.default { border-color: #3c7fb1; box-shadow: inset 0 0 0 1px #ffffffaa, 0 0 0 1px #9fd2f3; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; gap: 26px; padding-top: 22px; }
+    .shots { height: auto; display: grid; gap: 14px; justify-items: center; }
+    .shots img, .shots .s1, .shots .s2, .shots .s3 { position: static; width: min(360px, 100%); }
+    .tagb, .taga { display: none; }
+    .band .ver { display: none; }
   }
-  input, textarea { user-select: text; -webkit-user-select: text; }
-  #desk { position: fixed; inset: 0 0 var(--tb) 0; }
-
-  /* ---------------- desktop icons ---------------- */
-  .icons { position: absolute; top: 10px; left: 8px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 86px); gap: 2px 4px; height: calc(100% - 20px); }
-  .icon {
-    width: 78px; height: 84px; padding: 4px 2px; border: 1px solid transparent; border-radius: 3px; text-align: center; cursor: default;
-    color: #fff; text-shadow: 0 1px 2px #000, 0 0 6px #0008; font-size: 9pt; background: none; line-height: 1.2;
+  @media (max-width: 480px) {
+    .band { padding: 14px 16px; } .band img { width: 44px; height: 44px; } .band h1 { font-size: 24px; }
+    main { padding: 18px 16px; } .lead { font-size: 21px; }
+    .strip { padding: 12px 16px; }
   }
-  .icon:hover { background: linear-gradient(#ffffff40, #ffffff1a); border-color: #ffffff66; }
-  .icon.sel { background: linear-gradient(#7fb6ff80, #4b8fe866); border-color: #ffffffaa; }
-  .icon img, .icon svg { width: 44px; height: 44px; display: block; margin: 0 auto 3px; filter: drop-shadow(0 2px 2px #0006); pointer-events: none; }
-
-  /* ---------------- windows ---------------- */
-  .win { position: absolute; display: flex; flex-direction: column; min-width: 260px; min-height: 140px; }
-  .win[hidden] { display: none; }
-  .win .title-bar { cursor: default; touch-action: none; }
-  .win .title-bar-text { display: flex; align-items: center; gap: 6px; pointer-events: none; }
-  .win .title-bar-text img { width: 16px; height: 16px; }
-  .win > .window-body { flex: 1; min-height: 0; margin: 0; overflow: auto; background: #fff; }
-  .win.max { border-radius: 0; }
-  .win.anim { transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease, transform .2s ease, opacity .2s ease; }
-  .win.minimizing { transform: scale(.2); opacity: 0; pointer-events: none; }
-  body.peek .win { opacity: 0 !important; outline: 1px solid #fff9; }
-
-  /* DuoSeat main window */
-  .pad { padding: 24px 26px 18px; }
-  .hero { display: grid; grid-template-columns: 1fr 290px; gap: 24px; align-items: center; }
-  h1 { font: 400 22pt var(--font); color: #003399; margin: 0 0 8px; letter-spacing: -.2px; }
-  h1 .b { color: var(--b); }
-  .sub { font-size: 11.5pt; color: #333; margin: 0 0 14px; line-height: 1.45; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .actions button { min-height: 32px; padding: 0 20px; font-size: 10pt; }
-  .fine { color: #6d6d6d; margin-top: 10px; }
-  .fine a { color: #0066cc; }
-  .demo { position: relative; height: 205px; border: 1px solid #8e8f8f; border-radius: 3px; overflow: hidden;
-    background: radial-gradient(ellipse at 45% 45%, #8fd0ff, #2f7fd0 55%, #0b3a80); box-shadow: inset 0 0 0 1px #fff8; }
-  .mini { position: absolute; width: 134px; height: 86px; background: #fff; border-radius: 4px 4px 0 0; box-shadow: 1px 2px 6px #0007; border: 1px solid #0008; font: 8pt Consolas, monospace; overflow: hidden; }
-  .mini .bar { height: 13px; background: linear-gradient(#bcd4ef, #8fb3dd); border-bottom: 1px solid #6c8bb3; font: 7pt var(--font); padding: 0 4px; line-height: 13px; color: #123; }
-  .mini .txt { padding: 3px 4px; white-space: pre-wrap; line-height: 1.25; }
-  .mini.l { left: 12px; top: 18px; outline: 2px solid var(--a); }
-  .mini.r { right: 12px; top: 92px; outline: 2px solid var(--b); }
-  .cur { position: absolute; width: 18px; height: 22px; transition: left 1.2s ease-in-out, top 1.2s ease-in-out; z-index: 2; }
-  .cur svg { width: 100%; height: 100%; filter: drop-shadow(1px 1px 1px #0008); }
-  .demo .tag { position: absolute; bottom: 5px; left: 0; right: 0; text-align: center; color: #fff; font-size: 8pt; text-shadow: 0 1px 2px #000; }
-  .win .status-bar { margin: 0; }
-
-  /* photo viewer */
-  .viewer { display: flex; align-items: center; justify-content: center; background: #f4f6f9; height: 100%; padding: 10px; }
-  .viewer img { max-width: 100%; max-height: 100%; box-shadow: 0 2px 8px #0003; background: #fffdf6; }
-
-  /* notepad */
-  .menubar { display: flex; gap: 2px; padding: 2px 4px; background: #f5f6f7; border-bottom: 1px solid #dfe3e8; }
-  .menubar span { padding: 2px 7px; border: 1px solid transparent; border-radius: 2px; }
-  .menubar span:hover { background: linear-gradient(#fafbfd, #ebf3fd); border-color: #b8d6fb; }
-  .notepad { display: flex; flex-direction: column; height: 100%; }
-  .notepad textarea { flex: 1; width: 100%; border: 0; resize: none; font: 10.5pt Consolas, "Lucida Console", monospace; padding: 6px 8px; outline: none; box-shadow: none; }
-
-  /* explorer */
-  .explorer { display: flex; flex-direction: column; height: 100%; }
-  .cmdbar { display: flex; gap: 2px; padding: 4px 8px; background: linear-gradient(#f5f9fd, #dfe9f5); border-bottom: 1px solid #a0afc3; }
-  .cmdbar a { padding: 3px 9px; border: 1px solid transparent; border-radius: 3px; color: #1e395b; text-decoration: none; }
-  .cmdbar a:hover { background: linear-gradient(#fdfeff, #e3effd); border-color: #a6c4e8; }
-  .addr { margin: 6px 8px; padding: 3px 8px; border: 1px solid #8e8f8f; border-radius: 2px; background: #fff; color: #333; }
-  .files { flex: 1; overflow: auto; padding: 0 8px 8px; }
-  .files table { width: 100%; }
-  .files tr { cursor: default; }
-  .files td:first-child { display: flex; align-items: center; gap: 6px; }
-  .files td:first-child svg { width: 16px; height: 16px; flex: 0 0 16px; }
-
-  /* doodle */
-  .doodle { display: flex; flex-direction: column; height: 100%; }
-  .tools { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: linear-gradient(#f5f9fd, #dfe9f5); border-bottom: 1px solid #a0afc3; flex-wrap: wrap; }
-  .sw { width: 22px; height: 22px; border: 1px solid #555; border-radius: 3px; box-shadow: inset 0 0 0 1px #fff8; cursor: pointer; }
-  .sw.on { outline: 2px solid #3399ff; outline-offset: 1px; }
-  .tools .sep { width: 1px; height: 22px; background: #a0afc3; }
-  .tools button { min-width: 0; min-height: 23px; padding: 0 8px; }
-  .canvaswrap { flex: 1; position: relative; background: #fff; touch-action: none; cursor: crosshair; }
-  .canvaswrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-  /* copy dialog */
-  .copybody { padding: 14px 16px; }
-  .copybody .what { font-size: 11pt; color: #003399; margin-bottom: 4px; }
-  .copybody .from { color: #555; margin-bottom: 10px; }
-  .copybody [role=progressbar] > div { transition: width 1.3s cubic-bezier(.3,.7,.4,1); }
-
-  /* ---------------- taskbar ---------------- */
-  .taskbar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tb); z-index: 9000; display: flex; align-items: stretch;
-    background: linear-gradient(#ffffff26, #ffffff08 50%, #0000 50%), rgba(18, 38, 58, .62);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: inset 0 1px #fff4, 0 -1px #0008; }
-  .orb { width: 54px; display: grid; place-items: center; border: 0; background: none; padding: 0; min-width: 0; min-height: 0; box-shadow: none; }
-  .orb:hover, .orb:active, .orb:focus { background: none; box-shadow: none; border: 0; }
-  .orb span { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-    background: radial-gradient(circle at 50% 30%, #fff9 0 18%, transparent 45%), radial-gradient(circle at 50% 85%, #5dffb0, var(--g-dark) 55%, #0b3d14);
-    box-shadow: 0 0 0 1px #0009, inset 0 0 0 1px #fff6, 0 0 8px #5dffb066; transition: box-shadow .3s; }
-  .orb:hover span, .orb.on span { box-shadow: 0 0 0 1px #0009, inset 0 0 0 1px #fffa, 0 0 14px 3px #8dffc8aa; }
-  .orb img { width: 20px; height: 20px; filter: drop-shadow(0 1px 1px #0008); }
-  .tasks { display: flex; gap: 2px; padding-left: 4px; }
-  .task { --c: #7fd3ff; width: 60px; display: grid; place-items: center; border-radius: 3px; border: 1px solid transparent; margin: 1px 0; background: none; padding: 0; min-width: 0; min-height: 0; box-shadow: none; color: #fff; text-decoration: none; }
-  .task img, .task svg { width: 26px; height: 26px; filter: drop-shadow(0 1px 1px #0008); pointer-events: none; }
-  .task.running { border-color: #ffffff59; background: linear-gradient(#fff3, #fff1 50%, #0000 50%); }
-  .task.running.front { background: linear-gradient(#fff6, #fff3 50%, #fff1 50%); border-color: #ffffff99; }
-  .task:hover, .task:focus { background: radial-gradient(circle at 50% 110%, var(--c) 0, transparent 75%), linear-gradient(#fff3, #fff1 50%, #0000 50%); border-color: #ffffff80; box-shadow: inset 0 0 0 1px #fff4; outline: none; }
-  .spacer { flex: 1; }
-  .tray { display: flex; align-items: center; gap: 8px; color: #fff; padding: 0 6px; }
-  .tray .chev, .clock { cursor: default; border-radius: 3px; }
-  .tray .chev { padding: 4px 5px; font-size: 8pt; }
-  .tray .chev:hover, .clock:hover, .clock.on { background: #ffffff26; }
-  .clock { text-align: center; line-height: 1.25; padding: 2px 6px; min-width: 72px; }
-  .peek { width: 15px; border-left: 1px solid #ffffff40; box-shadow: inset 1px 0 #0006; background: linear-gradient(#ffffff1a, #ffffff05); }
-  .peek:hover { background: #ffffff38; }
-
-  /* ---------------- start menu ---------------- */
-  .start { position: fixed; left: 0; bottom: var(--tb); z-index: 9100; width: 400px; max-width: 100vw; display: none;
-    padding: 8px; border-radius: 6px 6px 0 0; border: 1px solid #000a;
-    background: linear-gradient(#ffffff30, #ffffff08), rgba(28, 58, 92, .78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: inset 0 0 0 1px #fff5, 0 -2px 18px #0008; }
-  .start.open { display: grid; grid-template-columns: 1fr 140px; gap: 8px; }
-  .start .left { background: #fff; border-radius: 4px; border: 1px solid #0006; padding: 6px; display: flex; flex-direction: column; min-height: 300px; }
-  .start .item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border: 1px solid transparent; border-radius: 3px; color: #222; text-decoration: none; font-size: 9.5pt; }
-  .start .item img, .start .item svg { width: 32px; height: 32px; flex: 0 0 32px; }
-  .start .item:hover { background: linear-gradient(#fafbfd, #ebf3fd); border-color: #b8d6fb; }
-  .start .item small { display: block; color: #666; font-size: 8pt; }
-  .start .search { margin-top: auto; padding-top: 6px; border-top: 1px solid #e3e3e3; }
-  .start .search input { width: 100%; }
-  .start .right { display: flex; flex-direction: column; gap: 2px; padding-top: 52px; position: relative; }
-  .start .avatar { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; border-radius: 6px; border: 1px solid #fff9; background: #fff; display: grid; place-items: center; box-shadow: 0 2px 6px #0008; }
-  .start .avatar img { width: 44px; height: 44px; }
-  .start .right a { color: #fff; text-decoration: none; padding: 6px 8px; border-radius: 3px; border: 1px solid transparent; text-shadow: 0 1px 2px #000; font-size: 9.5pt; }
-  .start .right a:hover { background: linear-gradient(#ffffff40, #ffffff10); border-color: #ffffff60; }
-  .start .shut { margin-top: auto; display: flex; justify-content: flex-end; }
-
-  /* ---------------- flyouts, menus ---------------- */
-  .flyout { position: fixed; z-index: 9100; display: none; background: linear-gradient(#ffffff, #f0f4f9); border: 1px solid #0007; border-radius: 4px; box-shadow: 2px 4px 14px #0007; padding: 10px; }
-  .flyout.open { display: block; }
-  .cal { right: 20px; bottom: calc(var(--tb) + 6px); width: 250px; }
-  .cal .big { font-size: 20pt; font-weight: 300; color: #1e395b; }
-  .cal .day { color: #0066cc; margin-bottom: 8px; }
-  .cal table { width: 100%; border-collapse: collapse; text-align: center; font-size: 8.5pt; }
-  .cal th { color: #666; font-weight: normal; padding: 3px 0; }
-  .cal td { padding: 4px 0; border: 1px solid transparent; border-radius: 2px; }
-  .cal td.today { border-color: #3399ff; background: #cce8ff; font-weight: bold; }
-  .cal td.dim { color: #aaa; }
-  .hidden-icons { right: 96px; bottom: calc(var(--tb) + 6px); padding: 8px; display: none; gap: 8px; }
-  .hidden-icons.open { display: flex; }
-  .hidden-icons span { width: 24px; height: 24px; border-radius: 50%; }
-  .ctx { position: fixed; z-index: 9200; display: none; min-width: 190px; padding: 2px; background: #f0f0f0; border: 1px solid #979797; box-shadow: 2px 2px 3px #0005; }
-  .ctx.open { display: block; }
-  .ctx a { display: block; padding: 4px 20px 4px 28px; color: #000; text-decoration: none; border: 1px solid transparent; border-radius: 3px; }
-  .ctx a:hover { background: linear-gradient(#fafbfd, #e3edfa); border-color: #b8d6fb; }
-  .ctx hr { border: 0; border-top: 1px solid #e0e0e0; border-bottom: 1px solid #fff; margin: 3px 2px 3px 26px; }
-
-  /* tray balloon */
-  .balloon { position: fixed; right: 16px; bottom: 50px; z-index: 9050; max-width: 270px; opacity: 0; transform: translateY(6px); transition: opacity .4s, transform .4s; pointer-events: none; }
-  .balloon.show { opacity: 1; transform: none; pointer-events: auto; }
-  .balloon b { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-  .balloon b img { width: 16px; height: 16px; }
-  .balloon .x { position: absolute; top: 4px; right: 7px; cursor: pointer; color: #666; font-size: 10pt; }
-
-  /* shutdown */
-  .bye { position: fixed; inset: 0; z-index: 9999; display: none; place-items: center; color: #fff; font: 300 18pt var(--font);
-    background: radial-gradient(ellipse at 50% 45%, #2f7fd0, #0b3a80 55%, #061a3d); text-shadow: 0 1px 3px #000; }
-  .bye.on { display: grid; }
-  .bye .spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid #ffffff40; border-top-color: #fff; display: inline-block; vertical-align: middle; margin-right: 12px; animation: sp 1s linear infinite; }
-  @keyframes sp { to { transform: rotate(360deg); } }
-
-  @media (max-width: 700px) {
-    .hero { grid-template-columns: 1fr; }
-    .pad { padding: 16px; }
-    h1 { font-size: 19pt; }
-    .demo { height: 200px; }
-    .start.open { grid-template-columns: 1fr; }
-    .start .right { padding-top: 6px; }
-    .start .avatar { display: none; }
-  }
-  @media (prefers-reduced-motion: reduce) { .cur, .win.anim { transition: none; } }
 </style>
 </head>
 <body>
-
-<div id="desk">
-  <nav class="icons" aria-label="Desktop">
-    <div class="icon" tabindex="0" data-open="duoseat"><img src="/logo.png" alt="">DuoSeat.exe</div>
-    <div class="icon" tabindex="0" data-open="drawing">
-      <svg viewBox="0 0 48 48"><rect x="6" y="9" width="36" height="30" rx="2" fill="#fff" stroke="#7a8ba3"/><rect x="9" y="12" width="30" height="20" fill="#bfe3ff"/><path d="M9 32l9-10 7 7 5-4 9 7z" fill="#2b9d2b"/><circle cx="31" cy="17" r="3" fill="#ff8c00"/></svg>
-      how-it-works.png
+<header>
+  <div class="band">
+    <img src="/logo.png" alt="">
+    <div>
+      <h1>DuoSeat</h1>
+      <p>Two people, one PC. Each gets their own cursor and keyboard.</p>
     </div>
-    <div class="icon" tabindex="0" data-open="doodle">
-      <svg viewBox="0 0 48 48"><path d="M8 38c6-2 9-8 14-8s4 7 10 6" fill="none" stroke="#0078d7" stroke-width="3" stroke-linecap="round"/><path d="M30 8l10 10-16 16-11 2 2-11z" fill="#ffcf6b" stroke="#a46a00"/><path d="M13 25l10 10" stroke="#a46a00"/><path d="M34 12l4 4" stroke="#ff8c00" stroke-width="4"/></svg>
-      Doodle.exe
-    </div>
-    <div class="icon" tabindex="0" data-open="readme">
-      <svg viewBox="0 0 48 48"><path d="M10 4h20l8 8v32H10z" fill="#fff" stroke="#8a8a8a"/><path d="M30 4v8h8" fill="#e8e8e8" stroke="#8a8a8a"/><g stroke="#9bb4d6" stroke-width="2"><path d="M15 20h18M15 25h18M15 30h18M15 35h12"/></g></svg>
-      README.txt
-    </div>
-    <div class="icon" tabindex="0" data-open="source">
-      <svg viewBox="0 0 48 48"><defs><linearGradient id="fd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#e2b54a"/></linearGradient></defs><path d="M4 12h15l4 4h21v24H4z" fill="#d9a63a"/><path d="M4 18h40v22H4z" fill="url(#fd)"/><path d="M4 18h40" stroke="#fff8"/></svg>
-      Source code
-    </div>
-  </nav>
-
-  <!-- DuoSeat -->
-  <section class="window glass win" id="w-duoseat" data-app="duoseat" data-w="800" data-h="340" hidden>
-    <div class="title-bar"><div class="title-bar-text"><img src="/logo.png" alt="">DuoSeat</div>
-      <div class="title-bar-controls"><button aria-label="Minimize"></button><button aria-label="Maximize"></button><button aria-label="Close"></button></div></div>
-    <div class="window-body">
-      <div class="pad">
-        <div class="hero">
-          <div>
-            <h1>Hand someone a <span class="b">cursor</span>,<br>not your laptop.</h1>
-            <p class="sub">DuoSeat gives a second person their own mouse and keyboard on your Windows PC. You both work at the same time. Nobody fights over the pointer.</p>
-            <div class="actions">
-              <button class="default" data-download>Download DuoSeat.exe</button>
-              <button data-open="drawing">How it works</button>
-            </div>
-            <div class="fine">130 KB &middot; Windows 10/11 &middot; no install &middot; free, <a href="https://github.com/basithladdu/duoseat/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a> &middot; <a href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener">GitHub</a></div>
-          </div>
-          <div class="demo" aria-label="Two people typing in two windows at once">
-            <div class="mini l"><div class="bar">your doc</div><div class="txt" id="ta"></div></div>
-            <div class="mini r"><div class="bar">their doc</div><div class="txt" id="tb"></div></div>
-            <div class="cur" id="ca" style="left:58px;top:52px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#0078d7" stroke="#fff" stroke-width="1.3"/></svg></div>
-            <div class="cur" id="cb" style="left:178px;top:108px"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.3"/></svg></div>
-            <div class="tag">you&nbsp;&nbsp;+&nbsp;&nbsp;them, same PC, same second</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="status-bar"><p class="status-bar-field">Same Wi-Fi, a phone, or another city</p><p class="status-bar-field">No TV? It makes a screen</p><p class="status-bar-field">v1.2.1</p></div>
-  </section>
-
-  <!-- the hand-drawn diagram -->
-  <section class="window glass win" id="w-drawing" data-app="drawing" data-w="820" data-h="470" hidden>
-    <div class="title-bar"><div class="title-bar-text"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='6' y='9' width='36' height='30' rx='2' fill='%23fff' stroke='%237a8ba3'/%3E%3Cpath d='M9 32l9-10 7 7 5-4 9 7z' fill='%232b9d2b'/%3E%3Ccircle cx='31' cy='17' r='3' fill='%23ff8c00'/%3E%3C/svg%3E" alt="">how-it-works.png - Photo Viewer</div>
-      <div class="title-bar-controls"><button aria-label="Minimize"></button><button aria-label="Maximize"></button><button aria-label="Close"></button></div></div>
-    <div class="window-body"><div class="viewer"><img src="/how-it-works.svg" alt="Player B's laptop sends mouse and keys over Wi-Fi to Player A's laptop; B gets an orange cursor on the TV, A's blue cursor is untouched"></div></div>
-  </section>
-
-  <!-- Doodle -->
-  <section class="window glass win" id="w-doodle" data-app="doodle" data-w="640" data-h="440" hidden>
-    <div class="title-bar"><div class="title-bar-text"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M30 8l10 10-16 16-11 2 2-11z' fill='%23ffcf6b' stroke='%23a46a00'/%3E%3Cpath d='M8 38c6-2 9-8 14-8s4 7 10 6' fill='none' stroke='%230078d7' stroke-width='3'/%3E%3C/svg%3E" alt="">Untitled - Doodle</div>
-      <div class="title-bar-controls"><button aria-label="Minimize"></button><button aria-label="Maximize"></button><button aria-label="Close"></button></div></div>
-    <div class="window-body"><div class="doodle">
-      <div class="tools">
-        <span class="sw on" data-c="#ff8c00" style="background:#ff8c00" title="Player B orange"></span>
-        <span class="sw" data-c="#0078d7" style="background:#0078d7" title="Player A blue"></span>
-        <span class="sw" data-c="#0bd82c" style="background:#0bd82c" title="Green"></span>
-        <span class="sw" data-c="#222222" style="background:#222" title="Black"></span>
-        <span class="sw" data-c="#ffffff" style="background:#fff" title="Eraser"></span>
-        <span class="sep"></span>
-        <select id="size" aria-label="Brush size"><option value="3">Thin</option><option value="7" selected>Medium</option><option value="16">Thick</option></select>
-        <span class="sep"></span>
-        <button id="clear">Clear</button>
-        <button id="save">Save</button>
-      </div>
-      <div class="canvaswrap"><canvas id="cv"></canvas></div>
-    </div></div>
-  </section>
-
-  <!-- README -->
-  <section class="window glass win" id="w-readme" data-app="readme" data-w="520" data-h="380" hidden>
-    <div class="title-bar"><div class="title-bar-text"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M10 4h20l8 8v32H10z' fill='%23fff' stroke='%238a8a8a'/%3E%3Cpath d='M15 20h18M15 25h18M15 30h18' stroke='%239bb4d6' stroke-width='2'/%3E%3C/svg%3E" alt="">README.txt - Notepad</div>
-      <div class="title-bar-controls"><button aria-label="Minimize"></button><button aria-label="Maximize"></button><button aria-label="Close"></button></div></div>
-    <div class="window-body"><div class="notepad">
-      <div class="menubar"><span>File</span><span>Edit</span><span>Format</span><span>View</span><span>Help</span></div>
-      <textarea spellcheck="false">DuoSeat
-=======
-Two people. One PC. Zero cursor fights.
-
-Setup
-1. Download DuoSeat.exe on both laptops. Same Wi-Fi.
-2. Your laptop:  I'm Player A  (click Allow on the firewall prompt)
-3. Their laptop: I'm Player B -> Find -> PIN -> Connect
-4. They press Ctrl+Alt+X. Done.
-
-No app? Open the link Player A shows, on any phone.
-No TV?  "Virtual screen for B" makes one.
-Far away? "Internet link" gives a https link.
-
-Keys (Player B)
-Ctrl+Alt+X   take over / come back
-Ctrl+Alt+M   click mode
-Ctrl+Alt+C   cursor to the middle
-
-Free. MIT. github.com/basithladdu/duoseat
-</textarea></div></div>
-  </section>
-
-  <!-- Source code -->
-  <section class="window glass win" id="w-source" data-app="source" data-w="600" data-h="400" hidden>
-    <div class="title-bar"><div class="title-bar-text"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M4 12h15l4 4h21v24H4z' fill='%23d9a63a'/%3E%3Cpath d='M4 18h40v22H4z' fill='%23f3cd6b'/%3E%3C/svg%3E" alt="">src</div>
-      <div class="title-bar-controls"><button aria-label="Minimize"></button><button aria-label="Maximize"></button><button aria-label="Close"></button></div></div>
-    <div class="window-body"><div class="explorer">
-      <div class="cmdbar"><a href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener">Open on GitHub</a><a href="https://github.com/basithladdu/duoseat/releases" target="_blank" rel="noopener">Releases</a><a href="https://github.com/basithladdu/duoseat/issues/new" target="_blank" rel="noopener">Report a bug</a></div>
-      <div class="addr">duoseat &#9656; src</div>
-      <div class="files"><table class="has-shadow"><thead><tr><th>Name</th><th>Does</th></tr></thead><tbody id="files"></tbody></table></div>
-    </div></div>
-    <div class="status-bar"><p class="status-bar-field" id="filecount"></p><p class="status-bar-field">Double-click to open</p></div>
-  </section>
-
-  <!-- copy dialog -->
-  <section class="window glass win" id="w-copy" data-app="copy" data-w="380" data-h="170" data-notask hidden>
-    <div class="title-bar"><div class="title-bar-text">Copying 1 item (130 KB)</div>
-      <div class="title-bar-controls"><button aria-label="Close"></button></div></div>
-    <div class="window-body"><div class="copybody">
-      <div class="what">Copying DuoSeat.exe</div>
-      <div class="from">from <b>github.com</b> to <b>Downloads</b></div>
-      <div role="progressbar" class="animate"><div id="bar" style="width:0%"></div></div>
-      <div id="eta">About 2 seconds remaining</div>
-    </div></div>
-  </section>
-</div>
-
-<!-- start menu -->
-<div class="start" id="start" role="menu">
-  <div class="left">
-    <a class="item" href="#" data-open="duoseat"><img src="/logo.png" alt=""><span>DuoSeat<small>Two cursors, one PC</small></span></a>
-    <a class="item" href="#" data-open="drawing"><svg viewBox="0 0 48 48"><rect x="6" y="9" width="36" height="30" rx="2" fill="#fff" stroke="#7a8ba3"/><rect x="9" y="12" width="30" height="20" fill="#bfe3ff"/><path d="M9 32l9-10 7 7 5-4 9 7z" fill="#2b9d2b"/><circle cx="31" cy="17" r="3" fill="#ff8c00"/></svg><span>How it works<small>the drawing</small></span></a>
-    <a class="item" href="#" data-open="doodle"><svg viewBox="0 0 48 48"><path d="M8 38c6-2 9-8 14-8s4 7 10 6" fill="none" stroke="#0078d7" stroke-width="3"/><path d="M30 8l10 10-16 16-11 2 2-11z" fill="#ffcf6b" stroke="#a46a00"/></svg><span>Doodle<small>draw something</small></span></a>
-    <a class="item" href="#" data-open="readme"><svg viewBox="0 0 48 48"><path d="M10 4h20l8 8v32H10z" fill="#fff" stroke="#8a8a8a"/><path d="M15 20h18M15 25h18M15 30h18" stroke="#9bb4d6" stroke-width="2"/></svg><span>README<small>setup in 4 lines</small></span></a>
-    <a class="item" href="#" data-open="source"><svg viewBox="0 0 48 48"><path d="M4 12h15l4 4h21v24H4z" fill="#d9a63a"/><path d="M4 18h40v22H4z" fill="#f3cd6b"/></svg><span>Source code<small>MIT, read it all</small></span></a>
-    <div class="search"><input type="text" id="find" placeholder="Search programs and files" aria-label="Search"></div>
+    <div class="ver">v1.2.1 &middot; Windows 10/11<br>free, MIT</div>
   </div>
-  <div class="right">
-    <div class="avatar"><img src="/logo.png" alt=""></div>
-    <a href="#" data-download>Download</a>
-    <a href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/basithladdu/duoseat/releases" target="_blank" rel="noopener">Releases</a>
-    <a href="https://github.com/basithladdu/duoseat/issues" target="_blank" rel="noopener">Issues</a>
-    <a href="https://wedevit.in" target="_blank" rel="noopener">wedevit.in</a>
-    <div class="shut"><button id="shutdown">Shut down</button></div>
+</header>
+
+<main>
+  <section>
+    <p class="lead">Hand someone a <span class="b">cursor</span>, not your laptop.</p>
+    <p class="intro">Your friend sits next to you with their own laptop. DuoSeat turns their mouse and keyboard into a second, orange cursor on your PC. You keep yours. Both of you type at the same time and nothing lands in the wrong window.</p>
+
+    <a class="cl" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cc83d"/><stop offset="1" stop-color="#1e8a16"/></linearGradient></defs><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
+      <div><b>Download DuoSeat.exe</b><span>130 KB. Same file on both laptops, nothing to install.</span></div>
+    </a>
+    <a class="cl" href="https://github.com/basithladdu/duoseat#no-app-use-a-browser-phone-works">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
+      <div><b>No app on the other side?</b><span>Any phone or browser works. Open the link Player A shows, type the PIN.</span></div>
+    </a>
+    <a class="cl" href="https://github.com/basithladdu/duoseat">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h9V3l9 8-9 8v-5H2z" fill="url(#g)"/></svg>
+      <div><b>Read the code</b><span>Every line is on GitHub. Built with the C# compiler Windows already has.</span></div>
+    </a>
+
+    <div class="keys">
+      <kbd>Ctrl+Alt+X</kbd><span>take over Player A's screen, or come back</span>
+      <kbd>No TV?</kbd><span>"Virtual screen for B" makes one, no cable</span>
+      <kbd>Far away?</kbd><span>"Internet link" gives a private https link</span>
+    </div>
+  </section>
+
+  <section class="shots" aria-label="The DuoSeat app">
+    <img class="s1" src="/choose.png" alt="DuoSeat asks: I'm Player A, or I'm Player B">
+    <img class="s2" src="/player-b.png" alt="Player B window: address, PIN, Connect, Take control">
+    <img class="s3" src="/player-a.png" alt="Player A window: address, PIN, Player B's screen, click mode">
+    <span class="tagb"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#ff8c00" stroke="#fff" stroke-width="1.3"/></svg>their laptop</span>
+    <span class="taga"><svg viewBox="0 0 18 22"><path d="M1 1v18l5-4 3.5 6 3-1.6L9 13.6h6z" fill="#0078d7" stroke="#fff" stroke-width="1.3"/></svg>your laptop</span>
+  </section>
+</main>
+
+<footer>
+  <div class="strip">
+    <span class="grow">Windows only has one cursor. DuoSeat draws a second one and posts its clicks straight into the window under it.</span>
+    <a class="btn" href="https://github.com/basithladdu/duoseat">GitHub</a>
+    <a class="btn default" href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe">Download</a>
   </div>
-</div>
-
-<div class="flyout cal" id="cal"></div>
-<div class="flyout hidden-icons" id="hidden"><span title="Player A" style="background:#0078d7"></span><span title="Player B" style="background:#ff8c00"></span><span title="All good" style="background:#0bd82c"></span></div>
-<div class="ctx" id="ctx">
-  <a href="#" data-act="refresh">Refresh</a><hr>
-  <a href="#" data-open="duoseat">Open DuoSeat</a>
-  <a href="#" data-open="doodle">New doodle</a>
-  <a href="#" data-download>Download DuoSeat.exe</a><hr>
-  <a href="#" data-act="tidy">Arrange windows</a>
-</div>
-
-<div class="balloon" id="balloon"><div role="tooltip" class="is-top is-left" style="position:relative" id="say"></div></div>
-<div class="bye" id="bye"><div><span class="spin"></span><span id="byeText">Shutting down...</span></div></div>
-
-<footer class="taskbar">
-  <div class="orb" id="orb" tabindex="0" title="Start"><span><img src="/logo.png" alt="Start"></span></div>
-  <div class="tasks" id="tasks"></div>
-  <div class="spacer"></div>
-  <div class="tray">
-    <span class="chev" id="chev" title="Show hidden icons">&#9650;</span>
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="#fff"><rect x="1" y="11" width="2.5" height="4"/><rect x="5" y="8" width="2.5" height="7"/><rect x="9" y="5" width="2.5" height="10"/><rect x="13" y="2" width="2.5" height="13" opacity=".45"/></g></svg>
-    <div class="clock" id="clock"><div id="t"></div><div id="d"></div></div>
-  </div>
-  <div class="peek" id="peek" title="Show desktop"></div>
 </footer>
-
-<script>
-"use strict";
-const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const EXE = 'https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe';
-const desk = $('#desk'), tasks = $('#tasks');
-const small = () => innerWidth <= 700;
-const APPS = {
-  duoseat: { pinned: true, icon: '/logo.png', c: '#ff9d2e' },
-  drawing: { icon: 'drawing', c: '#5dffb0' },
-  doodle: { icon: 'doodle', c: '#ffcf6b' },
-  readme: { icon: 'readme', c: '#c9dcff' },
-  source: { icon: 'source', c: '#ffd66b' },
-};
-const W = {};     // app -> state
-let z = 10;
-
-/* ---------------- window manager ---------------- */
-function win(app) { return $('#w-' + app); }
-function deskRect() { return desk.getBoundingClientRect(); }
-
-function placeNew(el, app) {
-  const r = deskRect(), w = Math.min(+el.dataset.w, r.width - 16), h = Math.min(+el.dataset.h, r.height - 16);
-  const n = Object.values(W).filter(s => s.open).length;
-  const x = Math.max(8, (r.width - w) / 2 + (app === 'duoseat' ? 0 : (n % 5) * 26 - 40));
-  const y = Math.max(8, (r.height - h) / 2 - 10 + (app === 'duoseat' ? 0 : (n % 5) * 22 - 30));
-  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
-}
-
-function open(app) {
-  const el = win(app); if (!el) return;
-  const s = W[app] || (W[app] = {});
-  if (!s.open) {
-    s.open = true; s.max = false; el.hidden = false;
-    placeNew(el, app);
-    if (small()) maximize(app, true, true);
-    if (app === 'doodle') setTimeout(sizeCanvas, 30);
-  }
-  if (s.min) restore(app); else focus(app);
-  renderTasks();
-}
-function focus(app) {
-  $$('.win').forEach(w => w.classList.remove('active'));
-  const el = win(app); if (!el || el.hidden) return;
-  el.style.zIndex = ++z; el.classList.add('active');
-  front = app; renderTasks();
-}
-let front = null;
-function minimize(app) {
-  const el = win(app), s = W[app]; if (!s || s.min) return;
-  const t = tasks.querySelector(`[data-task="${app}"]`), r = el.getBoundingClientRect();
-  if (t) { const tr = t.getBoundingClientRect(); el.style.transformOrigin = `${tr.left + tr.width / 2 - r.left}px ${tr.top - r.top}px`; }
-  el.classList.add('anim', 'minimizing'); s.min = true;
-  setTimeout(() => { if (s.min) { el.hidden = true; el.classList.remove('anim'); } }, 220);
-  el.classList.remove('active'); if (front === app) front = null;
-  renderTasks();
-}
-function restore(app) {
-  const el = win(app), s = W[app]; if (!s) return;
-  el.hidden = false; el.classList.add('anim', 'minimizing'); s.min = false;
-  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.remove('minimizing'); setTimeout(() => el.classList.remove('anim'), 220); }));
-  focus(app);
-}
-function maximize(app, on, instant) {
-  const el = win(app), s = W[app]; if (!s) return;
-  if (on === undefined) on = !s.max;
-  if (on === s.max) return;
-  if (!instant) el.classList.add('anim');
-  if (on) {
-    s.prev = { left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height };
-    const r = deskRect();
-    Object.assign(el.style, { left: '0px', top: '0px', width: r.width + 'px', height: r.height + 'px' });
-    el.classList.add('max');
-  } else {
-    Object.assign(el.style, s.prev || {});
-    el.classList.remove('max');
-  }
-  s.max = on;
-  const b = el.querySelector('[aria-label="Maximize"],[aria-label="Restore"]');
-  if (b) b.setAttribute('aria-label', on ? 'Restore' : 'Maximize');
-  setTimeout(() => { el.classList.remove('anim'); if (app === 'doodle') sizeCanvas(); }, 220);
-}
-function close(app) {
-  const el = win(app), s = W[app]; if (!s) return;
-  el.hidden = true; el.classList.remove('active', 'max', 'minimizing'); s.open = false; s.min = false; s.max = false;
-  const b = el.querySelector('[aria-label="Restore"]'); if (b) b.setAttribute('aria-label', 'Maximize');
-  if (front === app) front = null;
-  renderTasks();
-  if (!Object.values(W).some(x => x.open)) setTimeout(() => { if (!Object.values(W).some(x => x.open)) balloon('Quiet desktop', 'Double-click DuoSeat.exe to bring it back.', 4000); }, 600);
-}
-
-// title bar buttons, focus on click, drag, double-click to maximize
-$$('.win').forEach(el => {
-  const app = el.dataset.app;
-  el.addEventListener('pointerdown', () => focus(app));
-  el.querySelectorAll('.title-bar-controls button').forEach(b => b.addEventListener('click', e => {
-    e.stopPropagation();
-    const what = b.getAttribute('aria-label');
-    if (what === 'Minimize') minimize(app);
-    else if (what === 'Maximize' || what === 'Restore') maximize(app);
-    else if (what === 'Close') close(app);
-  }));
-  const bar = el.querySelector('.title-bar');
-  bar.addEventListener('dblclick', e => { if (!e.target.closest('button') && !el.dataset.notask) maximize(app); });
-  bar.addEventListener('pointerdown', e => {
-    if (e.target.closest('button') || e.button !== 0) return;
-    const s = W[app]; if (!s) return;
-    const r = deskRect(); let start = { x: e.clientX, y: e.clientY }, moved = false;
-    let ox = el.offsetLeft, oy = el.offsetTop;
-    bar.setPointerCapture(e.pointerId);
-    const mv = ev => {
-      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
-      if (!moved && Math.hypot(dx, dy) < 4) return;
-      if (!moved && s.max) {        // drag a maximized window: it restores under the pointer, like Win7
-        const fx = (e.clientX - r.left) / r.width;
-        maximize(app, false, true);
-        ox = e.clientX - r.left - el.offsetWidth * fx; oy = 0;
-      }
-      moved = true;
-      el.style.left = Math.min(r.width - 60, Math.max(-el.offsetWidth + 80, ox + dx)) + 'px';
-      el.style.top = Math.min(r.height - 30, Math.max(0, oy + dy)) + 'px';
-    };
-    const up = ev => {
-      bar.removeEventListener('pointermove', mv); bar.removeEventListener('pointerup', up);
-      if (moved && ev.clientY - r.top <= 2) maximize(app, true);   // Aero Snap: drop on the top edge
-    };
-    bar.addEventListener('pointermove', mv); bar.addEventListener('pointerup', up);
-  });
-});
-
-/* ---------------- taskbar ---------------- */
-function iconHTML(app) {
-  const ic = APPS[app].icon;
-  if (ic.startsWith('/')) return `<img src="${ic}" alt="">`;
-  return document.querySelector(`.icon[data-open="${app}"] svg`).outerHTML;
-}
-function renderTasks() {
-  const list = Object.keys(APPS).filter(a => APPS[a].pinned || (W[a] && W[a].open));
-  tasks.innerHTML = list.map(a => {
-    const s = W[a] || {}, cls = ['task', s.open ? 'running' : '', front === a && s.open && !s.min ? 'front' : ''].join(' ');
-    const title = win(a).querySelector('.title-bar-text').textContent.trim();
-    return `<div class="${cls}" tabindex="0" data-task="${a}" style="--c:${APPS[a].c}" title="${title}">${iconHTML(a)}</div>`;
-  }).join('') +
-  `<a class="task" style="--c:#c9d1d9" href="https://github.com/basithladdu/duoseat" target="_blank" rel="noopener" title="GitHub"><svg viewBox="0 0 16 16"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>`;
-}
-tasks.addEventListener('click', e => {
-  const t = e.target.closest('[data-task]'); if (!t) return;
-  const a = t.dataset.task, s = W[a];
-  if (!s || !s.open) open(a);
-  else if (s.min) restore(a);
-  else if (front === a) minimize(a);
-  else focus(a);
-});
-
-/* ---------------- opening things ---------------- */
-document.addEventListener('click', e => {
-  const o = e.target.closest('[data-open]');
-  if (o && !o.classList.contains('icon')) { e.preventDefault(); open(o.dataset.open); closeMenus(); return; }
-  const d = e.target.closest('[data-download]');
-  if (d) { e.preventDefault(); download(); closeMenus(); }
-});
-// desktop icons: click selects, double-click opens (a tap opens on touch screens)
-$$('.icon').forEach(ic => {
-  ic.addEventListener('click', e => { $$('.icon').forEach(i => i.classList.remove('sel')); ic.classList.add('sel'); if (e.pointerType === 'touch' || small()) open(ic.dataset.open); });
-  ic.addEventListener('dblclick', () => open(ic.dataset.open));
-  ic.addEventListener('keydown', e => { if (e.key === 'Enter') open(ic.dataset.open); });
-});
-desk.addEventListener('pointerdown', e => { if (e.target === desk || e.target.classList.contains('icons')) $$('.icon').forEach(i => i.classList.remove('sel')); });
-
-/* ---------------- download: Win7 copy dialog, then the real file ---------------- */
-function download() {
-  const el = win('copy');
-  open('copy');
-  const r = deskRect(); Object.assign(el.style, { left: (r.width - el.offsetWidth) / 2 + 'px', top: r.height * .32 + 'px' });
-  $('#bar').style.width = '0%'; $('#eta').textContent = 'About 2 seconds remaining';
-  requestAnimationFrame(() => requestAnimationFrame(() => $('#bar').style.width = '100%'));
-  setTimeout(() => { $('#eta').textContent = 'About 0 seconds remaining'; location.href = EXE; }, 1300);
-  setTimeout(() => { $('#eta').textContent = 'Done. Run it on both PCs.'; }, 2100);
-  setTimeout(() => { if (W.copy && W.copy.open) close('copy'); balloon('Download complete', 'DuoSeat.exe is in your Downloads. Same file for both laptops.'); }, 4600);
-}
-
-/* ---------------- start menu, flyouts, context menu ---------------- */
-const start = $('#start'), cal = $('#cal'), hid = $('#hidden'), ctx = $('#ctx');
-function closeMenus(except) {
-  if (except !== start) { start.classList.remove('open'); $('#orb').classList.remove('on'); }
-  if (except !== cal) { cal.classList.remove('open'); $('#clock').classList.remove('on'); }
-  if (except !== hid) hid.classList.remove('open');
-  if (except !== ctx) ctx.classList.remove('open');
-}
-$('#orb').addEventListener('click', e => { e.stopPropagation(); const on = !start.classList.contains('open'); closeMenus(start); start.classList.toggle('open', on); $('#orb').classList.toggle('on', on); if (on) setTimeout(() => $('#find').focus(), 30); });
-$('#clock').addEventListener('click', e => { e.stopPropagation(); const on = !cal.classList.contains('open'); closeMenus(cal); if (on) drawCal(); cal.classList.toggle('open', on); $('#clock').classList.toggle('on', on); });
-$('#chev').addEventListener('click', e => { e.stopPropagation(); const on = !hid.classList.contains('open'); closeMenus(hid); hid.classList.toggle('open', on); });
-desk.addEventListener('contextmenu', e => {
-  if (e.target.closest('.win')) return;
-  e.preventDefault(); closeMenus(ctx);
-  ctx.style.left = Math.min(e.clientX, innerWidth - 200) + 'px'; ctx.style.top = Math.min(e.clientY, innerHeight - 180) + 'px';
-  ctx.classList.add('open');
-});
-ctx.addEventListener('click', e => {
-  const a = e.target.closest('[data-act]'); if (!a) return; e.preventDefault(); closeMenus();
-  if (a.dataset.act === 'refresh') { $('.icons').style.opacity = 0; setTimeout(() => $('.icons').style.opacity = 1, 120); }
-  if (a.dataset.act === 'tidy') { let i = 0; Object.keys(W).forEach(k => { const s = W[k]; if (s.open && !s.min) { maximize(k, false, true); const el = win(k); el.style.left = 110 + i * 30 + 'px'; el.style.top = 20 + i * 28 + 'px'; focus(k); i++; } }); }
-});
-document.addEventListener('pointerdown', e => { if (!e.target.closest('.start,.flyout,.ctx,#orb,#clock,#chev')) closeMenus(); });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeMenus();
-  if (e.key === 'Meta' || (e.ctrlKey && e.key === 'Escape')) $('#orb').click();
-});
-// start menu search: type a program name, Enter opens it
-$('#find').addEventListener('input', e => {
-  const q = e.target.value.toLowerCase();
-  $$('.start .item').forEach(it => it.style.display = !q || it.textContent.toLowerCase().includes(q) ? '' : 'none');
-});
-$('#find').addEventListener('keydown', e => { if (e.key === 'Enter') { const it = $$('.start .item').find(i => i.style.display !== 'none'); if (it) it.click(); } });
-
-$('#shutdown').addEventListener('click', () => {
-  closeMenus(); const bye = $('#bye'); $('#byeText').textContent = 'Shutting down...'; bye.classList.add('on');
-  setTimeout(() => $('#byeText').textContent = 'Just kidding. Open source never sleeps.', 1600);
-  setTimeout(() => { bye.classList.remove('on'); open('duoseat'); }, 3200);
-});
-
-/* show desktop: click minimizes everything (click again brings it back), hover peeks */
-let shown = null;
-const peek = $('#peek');
-peek.addEventListener('mouseenter', () => { clearTimeout(peek.t); peek.t = setTimeout(() => document.body.classList.add('peek'), 400); });
-peek.addEventListener('mouseleave', () => { clearTimeout(peek.t); document.body.classList.remove('peek'); });
-peek.addEventListener('click', () => {
-  document.body.classList.remove('peek');
-  const visible = Object.keys(W).filter(k => W[k].open && !W[k].min);
-  if (visible.length) { shown = visible; visible.forEach(minimize); }
-  else if (shown) { shown.forEach(k => W[k].open && restore(k)); shown = null; }
-});
-
-/* clock + calendar */
-function tick() {
-  const n = new Date();
-  $('#t').textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  $('#d').textContent = n.toLocaleDateString();
-}
-tick(); setInterval(tick, 10000);
-function drawCal() {
-  const n = new Date(), y = n.getFullYear(), m = n.getMonth(), first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
-  let cells = '', d = 1 - first;
-  for (let r = 0; r < 6; r++) {
-    cells += '<tr>';
-    for (let c = 0; c < 7; c++, d++) {
-      const real = new Date(y, m, d);
-      cells += `<td class="${d === n.getDate() ? 'today' : ''} ${d < 1 || d > days ? 'dim' : ''}">${real.getDate()}</td>`;
-    }
-    cells += '</tr>';
-  }
-  cal.innerHTML = `<div class="big">${n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</div>
-    <div class="day">${n.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
-    <table><tr>${['Su','Mo','Tu','We','Th','Fr','Sa'].map(x => `<th>${x}</th>`).join('')}</tr>${cells}</table>`;
-}
-
-/* tray balloon */
-function balloon(title, text, ms) {
-  const b = $('#balloon');
-  $('#say').innerHTML = `<span class="x" id="bx">&times;</span><b><img src="/logo.png" alt="">${title}</b>${text}`;
-  b.classList.add('show'); $('#bx').onclick = () => b.classList.remove('show');
-  clearTimeout(balloon.t); balloon.t = setTimeout(() => b.classList.remove('show'), ms || 5000);
-}
-
-/* ---------------- Source code (explorer) ---------------- */
-const FILES = [
-  ['Injector.cs', 'the magic: B\'s input into a second cursor + keyboard'],
-  ['Host.cs', 'Player A window, listener, orange cursor'],
-  ['Client.cs', 'Player B: hooks, take control, reconnect'],
-  ['Viewer.cs', 'Live view window'],
-  ['Web.cs', 'browser Player B: HTTP + WebSocket'],
-  ['Extras.cs', 'virtual screen, internet link, own clipboard'],
-  ['Aero.cs', 'the Windows 7 look'],
-  ['Launcher.cs', '"Player A or Player B?"'],
-  ['Common.cs', 'protocol + Win32 imports'],
-];
-const fileIcon = '<svg viewBox="0 0 16 16"><path d="M3 1h7l3 3v11H3z" fill="#fff" stroke="#7a8ba3"/><path d="M5 7h6M5 9h6M5 11h4" stroke="#0078d7"/></svg>';
-$('#files').innerHTML = FILES.map(f => `<tr data-f="${f[0]}"><td>${fileIcon}${f[0]}</td><td>${f[1]}</td></tr>`).join('');
-$('#filecount').textContent = FILES.length + ' items';
-$$('#files tr').forEach(tr => {
-  tr.addEventListener('click', () => { $$('#files tr').forEach(x => x.classList.remove('highlighted')); tr.classList.add('highlighted'); if (small()) go(); });
-  const go = () => window.open('https://github.com/basithladdu/duoseat/blob/main/src/' + tr.dataset.f, '_blank', 'noopener');
-  tr.addEventListener('dblclick', go);
-});
-
-/* ---------------- Doodle ---------------- */
-const cv = $('#cv'), cx = cv.getContext('2d');
-let color = '#ff8c00', drawn = false;
-function sizeCanvas() {
-  const r = cv.parentElement.getBoundingClientRect(); if (!r.width) return;
-  const keep = drawn ? cv.toDataURL() : null, dpr = devicePixelRatio || 1;
-  cv.width = r.width * dpr; cv.height = r.height * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cx.fillStyle = '#fff'; cx.fillRect(0, 0, r.width, r.height);
-  if (keep) { const im = new Image(); im.onload = () => cx.drawImage(im, 0, 0, r.width, r.height); im.src = keep; }
-  else { cx.fillStyle = '#c3c3c3'; cx.font = '13px "Segoe UI", sans-serif'; cx.textAlign = 'center'; cx.fillText('Draw something. Both cursors welcome.', r.width / 2, r.height / 2); }
-}
-$$('.sw').forEach(s => s.addEventListener('click', () => { $$('.sw').forEach(x => x.classList.remove('on')); s.classList.add('on'); color = s.dataset.c; }));
-let last = null;
-cv.addEventListener('pointerdown', e => {
-  if (!drawn) { drawn = true; const r = cv.getBoundingClientRect(); cx.fillStyle = '#fff'; cx.fillRect(0, 0, r.width, r.height); }
-  cv.setPointerCapture(e.pointerId); last = pt(e); dot(last);
-});
-cv.addEventListener('pointermove', e => { if (!last) return; const p = pt(e); cx.strokeStyle = color; cx.lineWidth = +$('#size').value; cx.lineCap = cx.lineJoin = 'round'; cx.beginPath(); cx.moveTo(last.x, last.y); cx.lineTo(p.x, p.y); cx.stroke(); last = p; });
-['pointerup', 'pointercancel'].forEach(t => cv.addEventListener(t, () => last = null));
-function pt(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-function dot(p) { cx.fillStyle = color; cx.beginPath(); cx.arc(p.x, p.y, +$('#size').value / 2, 0, Math.PI * 2); cx.fill(); }
-$('#clear').addEventListener('click', () => { drawn = false; sizeCanvas(); });
-$('#save').addEventListener('click', () => { const a = document.createElement('a'); a.download = 'doodle.png'; a.href = cv.toDataURL('image/png'); a.click(); });
-addEventListener('resize', () => {
-  Object.keys(W).forEach(k => { if (W[k].open && W[k].max) { const r = deskRect(), el = win(k); el.style.width = r.width + 'px'; el.style.height = r.height + 'px'; } });
-  if (W.doodle && W.doodle.open) sizeCanvas();
-});
-
-/* ---------------- the little demo in the DuoSeat window ---------------- */
-const ta = $('#ta'), tb = $('#tb'), ca = $('#ca'), cb = $('#cb');
-const A = 'budget.xlsx\ndone by 6', B = 'fixed ur\nwifi lol';
-let i = 0;
-setInterval(() => {
-  if (i === 0) { ta.textContent = ''; tb.textContent = ''; ca.style.left = '58px'; ca.style.top = '52px'; cb.style.left = '178px'; cb.style.top = '108px'; }
-  if (i > 2) { const k = i - 3; if (k < A.length) ta.textContent += A[k]; if (k < B.length) tb.textContent += B[k]; }
-  if (++i > Math.max(A.length, B.length) + 18) { i = 0; ca.style.left = '150px'; ca.style.top = '30px'; cb.style.left = '40px'; cb.style.top = '120px'; }
-}, 140);
-
-// keyboard: Enter on the orb or a taskbar button acts like a click
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('#orb,[data-task]')) e.target.click(); });
-
-/* boot */
-renderTasks();
-open('duoseat');
-setTimeout(() => balloon('Player B connected', 'Your cursor stays yours. Theirs is the orange one.'), 1800);
-</script>
 </body>
 </html>
