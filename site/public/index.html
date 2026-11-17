@@ -266,9 +266,17 @@
     <!-- hover zones: point at a part, it zooms in and explains just that -->
     <g id="zones" fill="transparent">
       <rect data-z="wifi" x="300" y="0" width="600" height="56"/>
-      <rect data-z="A" x="88" y="92" width="398" height="282"/>
-      <rect data-z="mon" x="486" y="56" width="328" height="270"/>
-      <rect data-z="B" x="816" y="96" width="300" height="300"/>
+      <rect data-z="coffee" x="50" y="330" width="76" height="84"/>
+      <rect data-z="A" x="126" y="312" width="300" height="60"/>
+      <rect data-z="scrA" x="110" y="92" width="300" height="182"/>
+      <rect data-z="kbA" x="88" y="274" width="340" height="38"/>
+      <rect data-z="hdmi" x="410" y="250" width="226" height="80"/>
+      <rect data-z="mouseA" x="428" y="262" width="84" height="108"/>
+      <rect data-z="mon" x="486" y="56" width="328" height="194"/>
+      <rect data-z="mon" x="636" y="250" width="180" height="76"/>
+      <rect data-z="scrB" x="840" y="96" width="232" height="156"/>
+      <rect data-z="kbB" x="816" y="252" width="240" height="140"/>
+      <rect data-z="mouseB" x="1056" y="276" width="92" height="112"/>
     </g>
   </g>
 </svg>
@@ -363,17 +371,27 @@
   const svg = document.querySelector('.view svg'), cap = $('cap');
   const VIEW = {                                    // centre x, centre y, width (height follows 1200:440)
     full: [600, 220, 1200], A: [285, 232, 700], mon: [643, 168, 640], B: [960, 245, 690], wifi: [600, 140, 1000],
+    scrA: [261, 190, 520], kbA: [261, 292, 520], mouseA: [458, 305, 380], hdmi: [515, 285, 520],
+    scrB: [957, 190, 480], kbB: [950, 320, 480], mouseB: [1090, 330, 380], coffee: [98, 372, 360],
   };
   const HOVER = {
-    A: 'your laptop. your files, your mouse, your blue cursor.',
+    A: 'your laptop. the files never leave it.',
+    scrA: 'your screen. your window, your blue cursor. nobody else\'s.',
+    kbA: 'your keyboard. it only ever types in your window.',
+    mouseA: 'your mouse. it moves the blue cursor and nothing else.',
+    hdmi: 'one hdmi cable. that\'s the whole setup.',
     mon: 'his screen: a real monitor, or a virtual one DuoSeat makes.',
-    B: 'his laptop, his keyboard, his mouse. they drive the orange cursor.',
+    scrB: 'his laptop just says "you\'re on A\'s screen now". no files on it.',
+    kbB: 'his keyboard. types into his window on your monitor, same time as you.',
+    mouseB: 'his mouse. drives the orange cursor. yours doesn\'t budge.',
     wifi: 'same wi-fi between you. far away? DuoSeat gives him a link.',
+    coffee: 'a coffee ring. not a feature.',
   };
   let camAt = 'full', camT, hovering = null, step = ['full', ''];
   function aim(name) {
     // where VIEW[name] sits in the drawing -> a translate + scale that puts it in the middle of the frame
-    const [cx, cy, w] = VIEW[name], cw = svg.clientWidth, ch = svg.clientHeight;
+    let [cx, cy, w] = VIEW[name]; const cw = svg.clientWidth, ch = svg.clientHeight, h = w * 440 / 1200;
+    cx = Math.min(Math.max(cx, w / 2), 1200 - w / 2); cy = Math.min(Math.max(cy, h / 2), 440 - h / 2);   // never show past the napkin
     const s0 = Math.min(cw / 1200, ch / 440), ox = (cw - 1200 * s0) / 2, oy = (ch - 440 * s0) / 2, z = 1200 / w;
     const tx = cw / 2 - (ox + cx * s0) * z, ty = ch / 2 - (oy + cy * s0) * z;
     return `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${z.toFixed(4)})`;
@@ -387,13 +405,23 @@
   function show(name, text) { step = [name, text]; if (!hovering) cam(name, text); }
   addEventListener('resize', () => { svg.style.transition = 'none'; svg.style.transform = aim(camAt); requestAnimationFrame(() => svg.style.transition = ''); });
   // point at a part: zoom there and explain just that part; move away: back to the story
-  document.querySelectorAll('#zones rect').forEach(z => {
-    z.addEventListener('pointerenter', () => { hovering = z.dataset.z; cam(hovering, HOVER[hovering]); });
-    z.addEventListener('pointerleave', e => {
-      if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#zones')) return;
-      if (e.pointerType === 'touch') { setTimeout(() => { hovering = null; cam(step[0], step[1]); }, 3500); return; }
-      hovering = null; cam(step[0], step[1]);
-    });
+  // the camera moves the parts under the pointer, so: wait for the pointer to settle, and hold still while zooming
+  const view = $('view');
+  let pend, lock = 0, back;
+  const zoneAt = (x, y) => { const el = document.elementFromPoint(x, y); const z = el && el.closest && el.closest('#zones rect'); return z ? z.dataset.z : null; };
+  function look(name) { clearTimeout(pend); clearTimeout(back); hovering = name; lock = performance.now() + 950; name ? cam(name, HOVER[name]) : cam(step[0], step[1]); }
+  view.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;
+    const name = zoneAt(e.clientX, e.clientY);
+    if (!name || name === hovering) { clearTimeout(pend); return; }
+    clearTimeout(pend);
+    pend = setTimeout(() => look(name), Math.max(170, lock - performance.now()));
+  });
+  view.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') look(null); });
+  view.addEventListener('pointerdown', e => {           // phones: tap a part, it explains, then the story carries on
+    if (e.pointerType !== 'touch') return;
+    const name = zoneAt(e.clientX, e.clientY); if (!name) return;
+    look(name); back = setTimeout(() => look(null), 3500);
   });
 
   const mon = $('mon');
