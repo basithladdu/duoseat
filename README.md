@@ -4,7 +4,7 @@
 <p align="center"><b>Two people. One Windows PC. Zero cursor fights.</b></p>
 <p align="center"><a href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><b>⬇ Download DuoSeat.exe</b></a> &nbsp;·&nbsp; ~130 KB · Windows 10/11 · nothing to install &nbsp;·&nbsp; <a href="https://duoseat.wedevit.in">duoseat.wedevit.in</a></p>
 
-![how it works](docs/how-it-works.svg)
+<p align="center"><img src="docs/demo.gif" width="760" alt="Napkin drawing: you type in your window with the blue cursor while your friend types in his window on the monitor with the orange cursor, at the same time"></p>
 
 You're on your laptop. Your buddy sits next to you, eyes on your TV (it's plugged into *your* laptop), hands on *his own* laptop.
 DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both work at the same time. Nobody's mouse gets hijacked, and nobody's typing lands in the other person's window.
