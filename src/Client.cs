@@ -25,6 +25,23 @@ namespace DuoSeat
 
     class CaptureCurtain : Form
     {
+        // Touchpads (two-finger scroll) skip the low-level mouse hook: Windows hands the
+        // finished scroll straight to the window under the cursor. While B is in control
+        // that's this curtain, so it catches the scroll and sends it to Player A.
+        public Action<int, bool> Wheel;
+
+        protected override void WndProc(ref Message m)
+        {
+            if ((m.Msg == W.WM_MOUSEWHEEL || m.Msg == W.WM_MOUSEHWHEEL) && Wheel != null)
+            {
+                int delta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
+                if (delta != 0) Wheel(delta, m.Msg == W.WM_MOUSEHWHEEL);
+                m.Result = IntPtr.Zero;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
         public CaptureCurtain()
         {
             FormBorderStyle = FormBorderStyle.None;
@@ -44,10 +61,10 @@ namespace DuoSeat
             };
             Controls.Add(l);
         }
-        protected override bool ShowWithoutActivation { get { return true; } }
+        // not click-through and allowed to take focus, so scroll messages land here
         protected override CreateParams CreateParams
         {
-            get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x20 | 0x80 | 0x8000000; return cp; }
+            get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x80; return cp; }
         }
     }
 
@@ -127,6 +144,7 @@ namespace DuoSeat
             pingTimer.Interval = 1000;
             pingTimer.Tick += delegate { Send(Proto.Ping, Environment.TickCount | 1, 0, 0); };
 
+            curtain.Wheel = delegate (int delta, bool horizontal) { if (capturing) Send(Proto.Wheel, delta, horizontal ? 1 : 0, 0); };
             mouseProc = MouseHook;
             keyProc = KeyHook;
         }
@@ -403,6 +421,7 @@ namespace DuoSeat
                 W.SetCursorPos(center.X, center.Y);
                 curtain.Bounds = sc;
                 curtain.Show();
+                curtain.Activate();   // focused too, for PCs with "scroll inactive windows" turned off
                 capturing = true;
                 Status("Controlling Player A's screen. Ctrl+Alt+X to come back.");
             }

@@ -132,6 +132,19 @@ namespace DuoSeat
             owner.Send(Proto.Wheel, e.Delta, 0, 0);
         }
 
+        // sideways scroll (touchpad / tilt wheel) has no WinForms event
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == W.WM_MOUSEHWHEEL && !owner.Capturing)
+            {
+                int delta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
+                if (delta != 0) owner.Send(Proto.Wheel, delta, 1, 0);
+                m.Result = IntPtr.Zero;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
