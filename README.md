@@ -57,7 +57,7 @@ Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight
 ## Honest list
 
 - ✅ **Tested:** both typing at the same moment (A's 120+ keys and B's text, zero mix-ups), browsers (Edge), regular Windows text boxes, Shift/Ctrl+A/Tab/Enter/Backspace, dragging windows by the title bar, the browser Player B from a desktop browser (live view, clicks, typing, auto-reconnect).
-- 🟡 **Not yet on a real phone:** the touch gestures (tap, pinch, two-finger scroll) are written but not yet tried on an actual phone. Found a quirk? Open an issue.
+- ✅ **Phone gestures** (tested with simulated touch): tap, long-press right-click then picking from that menu, two-finger scroll, pinch zoom, Ctrl button + key, autocorrect rewriting a word, Pad slide + tap. A's cursor and active window stayed put the whole time. Not yet run on a physical phone; found a quirk? Open an issue.
 - 🟡 **Borrow blink:** taskbar, Start, context menus, Settings and Store apps. You'll see your cursor twitch for a few ms.
 - 🟡 **Same app for both** (you're both in Chrome): typing is fine; B's shortcuts borrow your keyboard state for about 40 ms. Different apps is the smoothest.
 - ❌ **Nope:** games (raw input), admin windows (unless DuoSeat runs as admin), UAC and lock screens, and there's one clipboard (Windows only has one).

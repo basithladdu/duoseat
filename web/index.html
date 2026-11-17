@@ -186,7 +186,7 @@ function click(btn) { send('b ' + btn + ' 1'); send('b ' + btn + ' 0'); }
 let lastTap = { t: 0, x: 0, y: 0, n: null };
 
 stage.addEventListener('pointerdown', e => {
-  stage.setPointerCapture(e.pointerId);
+  try { stage.setPointerCapture(e.pointerId); } catch (_) {}
   const p = sp(e); pts.set(e.pointerId, p);
   if (e.pointerType === 'mouse') { mouseDown(e, p); return; }
   if (pts.size === 1) {
