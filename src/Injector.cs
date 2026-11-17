@@ -375,7 +375,7 @@ namespace DuoSeat
             else if (vk == W.VK_CONTROL) vk = W.VK_LCONTROL;
             else if (vk == W.VK_MENU) vk = W.VK_LMENU;
             if (!down && !keyDown[vk]) return;            // up for a key we never saw go down
-            bool wasDown = keyDown[vk];
+            bool wasDown = keyDown[vk] && !inClip;   // the clipboard swap replays the same key-down once
             keyDown[vk] = down;
             if (down && vk == W.VK_CAPITAL && !wasDown) caps = !caps;
             Fold();
@@ -395,6 +395,18 @@ namespace DuoSeat
 
             IntPtr target = ResolveFocus();
             if (target == IntPtr.Zero) return;
+
+            // B's own clipboard: swap it in around B's copy / cut / paste shortcuts
+            int clip = 0;
+            if (down && !wasDown && !inClip && ClipSwap != null && !alt)
+            {
+                bool shift = keyDown[W.VK_SHIFT];
+                if (ctrl && (vk == 'C' || vk == 'X' || vk == 0x2D /*Insert*/)) clip = 1;
+                else if (!ctrl && shift && vk == 0x2E /*Delete*/) clip = 1;
+                else if ((ctrl && vk == 'V') || (!ctrl && shift && vk == 0x2D)) clip = 2;
+            }
+            if (clip != 0) { ClipboardShortcut(clip, target, vk, scan, ext); return; }
+
             bool isMod = Generic(vk) == W.VK_SHIFT || Generic(vk) == W.VK_CONTROL || Generic(vk) == W.VK_MENU;
             // B pressed/let go of Shift/Ctrl/Alt: first let B's app finish the keys already sent,
             // so each key is turned into a character with the modifiers that were held for it.
@@ -442,6 +454,28 @@ namespace DuoSeat
         }
 
         readonly bool[] charOnly = new bool[256];
+
+        // Set by the host when "separate clipboard" is on. Runs on the host's UI thread.
+        public interface IClipSwap { object Take(); void Put(object snapshot); }
+        public volatile IClipSwap ClipSwap;
+        object bClipboard;
+        bool inClip;
+
+        void ClipboardShortcut(int kind, IntPtr target, int vk, int scan, bool ext)
+        {
+            IClipSwap cs = ClipSwap;
+            object aClip = cs.Take();                       // what Player A has copied
+            if (kind == 2) cs.Put(bClipboard);              // paste: B's clipboard goes in for a moment
+            inClip = true;
+            try { OnKey(vk, scan, ext, true); }             // the real shortcut, B's modifiers held
+            finally { inClip = false; }
+            WaitIdle(target);
+            W.SendTimeout(target, W.WM_NULL, IntPtr.Zero, IntPtr.Zero);
+            Thread.Sleep(kind == 2 ? 250 : 150);            // let the app finish copying / pasting
+            W.SendTimeout(target, W.WM_NULL, IntPtr.Zero, IntPtr.Zero);
+            if (kind == 1) bClipboard = cs.Take();          // copy/cut: remember it as B's
+            cs.Put(aClip);                                  // and Player A gets theirs back
+        }
 
         // An Enter/Backspace/Tab key-down becomes a character only when B's app gets to it
         // (TranslateMessage). Characters we post directly must not overtake it.

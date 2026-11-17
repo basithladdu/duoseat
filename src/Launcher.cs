@@ -17,8 +17,8 @@ namespace DuoSeat
             string role = null;
             foreach (string a in args)
             {
-                if (a == "--host" || a == "--pin") role = "A";
-                if (a == "--client") role = "B";
+                if (a == "--host" || (a == "--pin" && role == null)) role = "A";
+                if (a == "--client" || a == "--connect") role = "B";
             }
             if (role == null)
             {

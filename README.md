@@ -2,7 +2,7 @@
 
 <h1 align="center">DuoSeat</h1>
 <p align="center"><b>Two people. One Windows PC. Zero cursor fights.</b></p>
-<p align="center"><a href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><b>⬇ Download DuoSeat.exe</b></a> &nbsp;·&nbsp; ~70 KB · Windows 10/11 · nothing to install</p>
+<p align="center"><a href="https://github.com/basithladdu/duoseat/releases/latest/download/DuoSeat.exe"><b>⬇ Download DuoSeat.exe</b></a> &nbsp;·&nbsp; ~130 KB · Windows 10/11 · nothing to install</p>
 
 ![how it works](docs/how-it-works.svg)
 
@@ -25,6 +25,18 @@ DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both w
 | `Ctrl+Alt+C` | cursor lost? bring it to the middle |
 
 <p align="center"><img src="docs/choose.png" width="300"> <img src="docs/player-a.png" width="270"> <img src="docs/player-b.png" width="270"></p>
+
+## The extras (all on Player A's window)
+
+- **Live view** (Player B's app): A's screen in a window on B's laptop. Mouse over it = your orange cursor over there. Keys go there while it's in front, even Alt+Tab. Up to ~30 fps on Wi-Fi.
+- **Virtual screen for B**: no TV? DuoSeat adds a real extra screen with no cable, using the open-source [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, official release, SHA-256 checked, one Windows permission prompt). B works on it through Live view. Same button removes it.
+- **Internet link**: B is in another city? One click opens a private `https://….trycloudflare.com` link through Cloudflare's free tunnel (their signed, official `cloudflared`). The PIN turns 8 digits, and 5 wrong guesses lock the door for a minute.
+- **Run as admin**: lets B use admin windows too (Task Manager, installers).
+- **Own clipboard for B** (beta): B's Ctrl+C / Ctrl+V use B's own clipboard, so you never paste each other's stuff.
+- **Plug a TV in mid-session**: B moves onto it by himself. Pull it out: B comes back to the laptop screen.
+- **Lag readout** on B's window. On home Wi-Fi expect a few ms. A network cable between the laptops is the fastest; Bluetooth is slower than Wi-Fi.
+
+Shortcut for B: `DuoSeat.exe --connect 192.168.0.106 --pin 1234 --live` connects and opens Live view straight away.
 
 ## No app? Use a browser (phone works)
 
@@ -60,8 +72,11 @@ Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight
 - ✅ **Phone gestures** (tested with simulated touch): tap, long-press right-click then picking from that menu, two-finger scroll, pinch zoom, Ctrl button + key, autocorrect rewriting a word, Pad slide + tap. A's cursor and active window stayed put the whole time. Not yet run on a physical phone; found a quirk? Open an issue.
 - 🟡 **Borrow blink:** taskbar, Start, context menus, Settings and Store apps. You'll see your cursor twitch for a few ms.
 - 🟡 **Same app for both** (you're both in Chrome): typing is fine; B's shortcuts borrow your keyboard state for about 40 ms. Different apps is the smoothest.
-- ❌ **Nope:** games (raw input), admin windows (unless DuoSeat runs as admin), UAC and lock screens, and there's one clipboard (Windows only has one).
-- 🔒 PIN-protected, local network only, no accounts, no internet, no telemetry. Not encrypted (keys and the live picture), so use it on your home Wi-Fi, not café Wi-Fi.
+- ✅ **Two real laptops:** B on his own laptop over home Wi-Fi, cursor on A's TV, typing while A typed.
+- ✅ **Also tested:** app Live view (click + type through it), internet link (page + live picture through Cloudflare, ~180 ms to first frame), own clipboard (A's stays A's).
+- 🟡 **Virtual screen:** the install path is new; the driver itself is widely used. Tell us if it misbehaves.
+- ❌ **Nope (Windows says no):** games that read raw input, the UAC prompt and the lock screen (Windows' secure desktop).
+- 🔒 PIN-protected, no accounts, no telemetry. On Wi-Fi it's not encrypted, so use your home Wi-Fi. The internet link is HTTPS end to end through Cloudflare.
 
 ## Build it yourself
 
@@ -80,6 +95,8 @@ That gives you `dist\DuoSeat.exe`.
 | `src/Injector.cs` | the magic: turns B's input into a second cursor and keyboard |
 | `src/Client.cs` | Player B: hooks, capture, auto-reconnect |
 | `src/Web.cs` + `web/index.html` | Player B in a browser: tiny HTTP + WebSocket server, JPEG live view |
+| `src/Viewer.cs` | Player B's Live view window |
+| `src/Extras.cs` | virtual screen, internet link, signature checks, PIN lockout, own clipboard |
 | `src/Aero.cs` | the Windows 7 look |
 | `src/Common.cs` | protocol and Win32 imports |
 

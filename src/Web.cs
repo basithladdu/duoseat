@@ -152,9 +152,13 @@ namespace DuoSeat
                 // first message: "p <pin>"
                 if (!ReadFrame(s, out op, out data) || op != 1) return;
                 string hello = Encoding.UTF8.GetString(data);
-                if (!hello.StartsWith("p ") || hello.Substring(2).Trim() != host.Pin)
+                if (Guard.Locked || !hello.StartsWith("p ") || hello.Substring(2).Trim() != host.Pin)
                 {
-                    conn.Text("bad"); host.Log("Wrong PIN from browser " + who); Thread.Sleep(300); return;
+                    bool wasLocked = Guard.Locked;
+                    if (!wasLocked) Guard.Failed();
+                    conn.Text(Guard.Locked ? "locked" : "bad");
+                    host.Log(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from browser " + who);
+                    Thread.Sleep(300); return;
                 }
                 if (!host.TryBegin(c)) { conn.Text("busy"); return; }
                 began = true;
@@ -168,7 +172,7 @@ namespace DuoSeat
 
                 while (ReadFrame(s, out op, out data))
                 {
-                    if (op == 8) break;                                 // close
+                    if (op == 8) { try { conn.Send(8, data ?? new byte[0]); } catch { } break; }   // close: answer it
                     if (op == 9) { conn.Send(10, data); continue; }     // ping -> pong
                     if (op != 1) continue;
                     try { Command(host, conn, inj, Encoding.UTF8.GetString(data)); } catch { }
@@ -235,11 +239,23 @@ namespace DuoSeat
             catch { conn.Alive = false; }
         }
 
-        static byte[] Capture(Injector inj, ImageCodecInfo jpeg, EncoderParameters ep)
+        static ImageCodecInfo jpegCodec;
+
+        // One JPEG of B's screen with both cursors drawn on it (used by the browser and the app viewer).
+        public static byte[] Frame(Injector inj, int maxWidth, long quality)
+        {
+            if (jpegCodec == null)
+                foreach (ImageCodecInfo ci in ImageCodecInfo.GetImageEncoders()) if (ci.MimeType == "image/jpeg") jpegCodec = ci;
+            EncoderParameters ep = new EncoderParameters(1);
+            ep.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+            return Capture(inj, jpegCodec, ep, maxWidth);
+        }
+
+        static byte[] Capture(Injector inj, ImageCodecInfo jpeg, EncoderParameters ep, int maxWidth = 1600)
         {
             RECT a = inj.Area;
             if (a.Width <= 0 || a.Height <= 0) return null;
-            double scale = Math.Min(1.0, 1600.0 / a.Width);
+            double scale = Math.Min(1.0, (double)maxWidth / a.Width);
             int w = (int)(a.Width * scale), h = (int)(a.Height * scale);
             using (Bitmap full = new Bitmap(a.Width, a.Height, PixelFormat.Format24bppRgb))
             using (Bitmap small = new Bitmap(w, h, PixelFormat.Format24bppRgb))

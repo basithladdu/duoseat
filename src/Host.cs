@@ -19,7 +19,12 @@ namespace DuoSeat
             bool created;
             using (Mutex m = new Mutex(true, "DuoSeatHostSingleInstance", out created))
             {
-                if (!created) { MessageBox.Show("DuoSeat host is already running.", "DuoSeat"); return; }
+                // restarting as admin: wait for the old window to close
+                if (!created && Array.IndexOf(Environment.GetCommandLineArgs(), "--elevated") > 0)
+                {
+                    try { created = m.WaitOne(8000); } catch (AbandonedMutexException) { created = true; }
+                }
+                if (!created) { MessageBox.Show("DuoSeat (Player A) is already open.", "DuoSeat"); return; }
                 Application.Run(new HostForm());
             }
         }
@@ -88,7 +93,7 @@ namespace DuoSeat
 
     class MonitorItem
     {
-        public string Name; public RECT Rect;
+        public string Name; public RECT Rect; public bool Virtual;
         public override string ToString() { return Name; }
     }
 
@@ -96,7 +101,12 @@ namespace DuoSeat
     {
         readonly Label lblAddr = new Label(), lblPin = new Label(), lblStatus = new Label();
         readonly ComboBox cboScreen = new ComboBox(), cboMode = new ComboBox();
-        readonly CheckBox chkFrame = new CheckBox();
+        readonly CheckBox chkFrame = new CheckBox(), chkClip = new CheckBox();
+        ClipSwapper clipSwap;
+        readonly Button btnVirtual = new Button(), btnNet = new Button();
+        readonly LinkLabel lnkNet = new LinkLabel();
+        Tunnel tunnel;
+        bool busyExtra;
         readonly CursorOverlay cursor = new CursorOverlay();
         readonly FrameOverlay frame = new FrameOverlay();
         readonly System.Windows.Forms.Timer uiTimer = new System.Windows.Forms.Timer();
@@ -113,7 +123,7 @@ namespace DuoSeat
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(440, 300);
+            ClientSize = new Size(440, 372);
 
             Label l1 = new Label { Text = "Player B connects with the DuoSeat app, or any phone/browser:", Bounds = new Rectangle(14, 10, 412, 20) };
             lblAddr.Bounds = new Rectangle(14, 30, 412, 40);
@@ -139,19 +149,34 @@ namespace DuoSeat
             cboMode.SelectedIndex = 0;
             cboMode.SelectedIndexChanged += delegate { Injector inj = active; if (inj != null) inj.BorrowMode = cboMode.SelectedIndex == 1; cursor.Borrow = cboMode.SelectedIndex == 1; cursor.Invalidate(); };
 
-            chkFrame.Text = "Orange frame around Player B's window";
-            chkFrame.Bounds = new Rectangle(14, 186, 412, 24);
+            chkFrame.Text = "Orange frame around B's window";
+            chkFrame.Bounds = new Rectangle(14, 186, 210, 24);
             chkFrame.Checked = true;
+            chkClip.Text = "Own clipboard for B (beta)";
+            chkClip.Bounds = new Rectangle(228, 186, 200, 24);
+            chkClip.CheckedChanged += delegate { Injector inj = active; if (inj != null) inj.ClipSwap = chkClip.Checked ? clipSwap : null; };
+            clipSwap = new ClipSwapper(this);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--own-clipboard") > 0) chkClip.Checked = true;
 
-            lblStatus.Bounds = new Rectangle(14, 216, 412, 36);
+            btnVirtual.Bounds = new Rectangle(14, 216, 136, 30);
+            btnVirtual.Click += delegate { VirtualClicked(); };
+            btnNet.Text = "Internet link"; btnNet.Bounds = new Rectangle(154, 216, 132, 30);
+            btnNet.Click += delegate { NetClicked(); };
+            Button btnAdmin = new Button { Text = IsAdmin() ? "Admin: on" : "Run as admin", Bounds = new Rectangle(290, 216, 136, 30), Enabled = !IsAdmin() };
+            btnAdmin.Click += delegate { Elevate(); };
+            lnkNet.Bounds = new Rectangle(14, 252, 412, 22);
+            lnkNet.Font = new Font("Consolas", 9.5f, FontStyle.Bold);
+            lnkNet.LinkClicked += delegate { if (tunnel != null && tunnel.Link != null) { try { Clipboard.SetText(tunnel.Link); lblStatus.Text = "Link copied. Send it to Player B with the PIN."; } catch { } } };
+
+            lblStatus.Bounds = new Rectangle(14, 278, 412, 48);
             lblStatus.Text = "Waiting for Player B...";
             Label tip = new Label
             {
                 Text = "Tip: fewest surprises when A and B use different apps (say A on Chrome, B on Edge).",
-                Bounds = new Rectangle(14, 254, 412, 40), ForeColor = Color.DimGray
+                Bounds = new Rectangle(14, 328, 412, 40), ForeColor = Color.DimGray
             };
 
-            Controls.AddRange(new Control[] { l1, lblAddr, l2, lblPin, btnPin, l3, cboScreen, l4, cboMode, chkFrame, lblStatus, tip });
+            Controls.AddRange(new Control[] { l1, lblAddr, l2, lblPin, btnPin, l3, cboScreen, l4, cboMode, chkFrame, chkClip, btnVirtual, btnNet, btnAdmin, lnkNet, lblStatus, tip });
             Aero.Dress(this, "Player A", "Your cursor stays yours. Player B gets the orange one.", 0);
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
 
@@ -172,6 +197,98 @@ namespace DuoSeat
             StartServer();
         }
 
+        bool hasVirtual;
+
+        // ------------------------------------------------------------------ extras
+        void VirtualClicked()
+        {
+            if (busyExtra) return;
+            bool removing = hasVirtual;
+            string ask = removing
+                ? "Remove Player B's virtual screen?\n\nWindows will ask for permission."
+                : "Give Player B a screen of their own, no monitor needed?\n\n" +
+                  "DuoSeat adds a virtual screen using the free, open-source Virtual Display Driver (MIT, github.com/VirtualDrivers). " +
+                  "It downloads the official release (70 MB, checked by SHA-256) and Windows asks for permission once.\n\n" +
+                  "Player B then works on it through Live view.";
+            if (MessageBox.Show(this, ask, "DuoSeat", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            busyExtra = true; btnVirtual.Enabled = false;
+            Thread t = new Thread(delegate ()
+            {
+                string msg;
+                try
+                {
+                    bool ok = removing ? VirtualScreen.Remove(Status) : VirtualScreen.Install(Status);
+                    msg = !ok ? "Cancelled at the Windows permission prompt."
+                        : removing ? "Virtual screen removed." : "Adding the virtual screen... (it appears in a few seconds)";
+                }
+                catch (Exception ex) { msg = "Virtual screen: " + ex.Message; }
+                BeginInvoke((Action)delegate { busyExtra = false; btnVirtual.Enabled = true; lblStatus.Text = msg; LoadMonitorsKeep(); });
+            }) { IsBackground = true };
+            t.Start();
+        }
+
+        void LoadMonitorsKeep() { OnDisplayChanged(null, EventArgs.Empty); }
+
+        void NetClicked()
+        {
+            if (tunnel != null)
+            {
+                tunnel.Stop(); tunnel = null;
+                btnNet.Text = "Internet link"; lnkNet.Text = "";
+                NewPin(4);
+                lblStatus.Text = "Internet link closed. Only this Wi-Fi can connect now.";
+                return;
+            }
+            if (MessageBox.Show(this,
+                "Let Player B connect from anywhere (another network, another city)?\n\n" +
+                "DuoSeat opens a private https link using Cloudflare's free tunnel (their official, signed cloudflared tool). " +
+                "Player B opens the link in any browser and types the PIN.\n\nThe PIN becomes 8 digits while the link is open. Close it with the same button.",
+                "DuoSeat", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            NewPin(8);
+            tunnel = new Tunnel();
+            btnNet.Text = "Close link"; btnNet.Enabled = false;
+            Tunnel me = tunnel;
+            me.Start(Status,
+                delegate (string link)
+                {
+                    BeginInvoke((Action)delegate
+                    {
+                        if (tunnel != me) return;
+                        btnNet.Enabled = true;
+                        lnkNet.Text = link + "   (click to copy)";
+                        lblStatus.Text = "Internet link is live. Send the link + PIN to Player B.";
+                    });
+                },
+                delegate (string err)
+                {
+                    BeginInvoke((Action)delegate
+                    {
+                        if (tunnel != me) return;
+                        me.Stop(); tunnel = null; btnNet.Enabled = true; btnNet.Text = "Internet link"; lnkNet.Text = "";
+                        NewPin(4);
+                        lblStatus.Text = "Internet link failed: " + err;
+                    });
+                });
+        }
+
+        static bool IsAdmin()
+        {
+            try { return new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator); }
+            catch { return false; }
+        }
+
+        // Admin windows (Task Manager, installers, admin terminals) only take input from admin apps.
+        void Elevate()
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Application.ExecutablePath, "--host --elevated")
+                { Verb = "runas", UseShellExecute = true });
+                Close();
+            }
+            catch (System.ComponentModel.Win32Exception) { lblStatus.Text = "Stayed normal (permission prompt was cancelled)."; }
+        }
+
         // monitor or TV plugged in / unplugged / resolution changed
         void OnDisplayChanged(object sender, EventArgs e)
         {
@@ -179,7 +296,21 @@ namespace DuoSeat
             BeginInvoke((Action)delegate
             {
                 string keep = cboScreen.SelectedItem == null ? null : cboScreen.SelectedItem.ToString();
+                bool hadVirtual = hasVirtual;
+                int before = cboScreen.Items.Count;
                 LoadMonitors();
+                if (hasVirtual && !hadVirtual)
+                {
+                    ApplyArea();   // LoadMonitors already picked the new virtual screen
+                    lblStatus.Text = "Virtual screen ready. It's Player B's: they see it in Live view.";
+                    return;
+                }
+                if (before <= 1 && cboScreen.Items.Count > 1)
+                {
+                    ApplyArea();   // TV / monitor just plugged in: that's B's screen now
+                    lblStatus.Text = "New screen found. Player B moved onto it.";
+                    return;
+                }
                 bool found = false;
                 if (keep != null)
                     for (int i = 0; i < cboScreen.Items.Count; i++)
@@ -195,14 +326,21 @@ namespace DuoSeat
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+            if (tunnel != null) tunnel.Stop();
             try { if (listener != null) listener.Stop(); } catch { }
             try { TcpClient c = activeClient; if (c != null) c.Close(); } catch { }
             base.OnFormClosing(e);
         }
 
-        void NewPin()
+        void NewPin() { NewPin(tunnel != null ? 8 : 4); }
+
+        void NewPin(int digits)
         {
-            pin = new Random().Next(1000, 10000).ToString();
+            byte[] rnd = new byte[8];
+            using (System.Security.Cryptography.RandomNumberGenerator rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(rnd);
+            ulong v = BitConverter.ToUInt64(rnd, 0);
+            ulong lo = digits >= 8 ? 10000000UL : 1000UL, span = digits >= 8 ? 90000000UL : 9000UL;
+            pin = (lo + v % span).ToString();
             string[] args = Environment.GetCommandLineArgs();
             for (int i = 1; i < args.Length - 1; i++)
                 if (args[i] == "--pin" && !fixedPinUsed) { pin = args[i + 1]; fixedPinUsed = true; }
@@ -230,18 +368,21 @@ namespace DuoSeat
             int idx = 0;
             W.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, delegate (IntPtr h, IntPtr dc, ref RECT r, IntPtr d)
             {
-                MONITORINFO mi = new MONITORINFO();
-                mi.cbSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(MONITORINFO));
-                W.GetMonitorInfo(h, ref mi);
+                MONITORINFOEX mi = new MONITORINFOEX();
+                mi.cbSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(MONITORINFOEX));
+                W.GetMonitorInfoEx(h, ref mi);
                 idx++;
                 bool primary = (mi.dwFlags & 1) != 0;
+                bool virt = VirtualScreen.IsVirtual(mi.szDevice);
                 mons.Add(new MonitorItem
                 {
-                    Name = "Screen " + idx + (primary ? " - laptop" : " - extra monitor") + " (" + mi.rcMonitor.Width + "x" + mi.rcMonitor.Height + ")",
-                    Rect = mi.rcMonitor
+                    Name = "Screen " + idx + (virt ? " - virtual (B's own)" : primary ? " - laptop" : " - extra monitor") + " (" + mi.rcMonitor.Width + "x" + mi.rcMonitor.Height + ")",
+                    Rect = mi.rcMonitor, Virtual = virt
                 });
                 return true;
             }, IntPtr.Zero);
+            hasVirtual = mons.Exists(delegate (MonitorItem m) { return m.Virtual; });
+            btnVirtual.Text = hasVirtual ? "Remove virtual screen" : "Virtual screen for B";
             RECT all = new RECT
             {
                 Left = W.GetSystemMetrics(W.SM_XVIRTUALSCREEN),
@@ -254,7 +395,8 @@ namespace DuoSeat
             for (int i = 0; i < mons.Count; i++)
             {
                 cboScreen.Items.Add(mons[i]);
-                if (mons[i].Name.Contains("extra")) pick = i;
+                if (mons[i].Name.Contains("extra") && !mons[pick].Virtual) pick = i;
+                if (mons[i].Virtual) pick = i;          // a virtual screen was made for B: use it
             }
             if (mons.Count > 1) cboScreen.Items.Add(new MonitorItem { Name = "All screens", Rect = all });
             cboScreen.SelectedIndex = pick;
@@ -378,6 +520,7 @@ namespace DuoSeat
             Injector inj = new Injector(area);
             inj.CursorHwnd = cursor.Handle;
             inj.BorrowMode = (bool)Invoke((Func<bool>)delegate { return cboMode.SelectedIndex == 1; });
+            inj.ClipSwap = (bool)Invoke((Func<bool>)delegate { return chkClip.Checked; }) ? clipSwap : null;
             inj.ModeChanged = delegate
             {
                 BeginInvoke((Action)delegate
@@ -418,23 +561,80 @@ namespace DuoSeat
             string who = ((IPEndPoint)c.Client.RemoteEndPoint).Address.ToString();
             string[] parts = hello.Split(new[] { ' ' }, 3);
             if (parts.Length < 2 || parts[0] != Proto.Hello) return;
-            if (parts[1] != pin) { Proto.WriteLine(s, "BADPIN"); Status("Wrong PIN from " + who); Thread.Sleep(300); return; }
+            if (Guard.Locked || parts[1] != pin)
+            {
+                if (!Guard.Locked) Guard.Failed();
+                Proto.WriteLine(s, "BADPIN"); Status(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from " + who);
+                Thread.Sleep(300); return;
+            }
             if (!TryBegin(c)) { Proto.WriteLine(s, "BUSY"); return; }
             Injector inj = null;
+            object wlock = new object();
+            bool alive = true, streaming = false;
+            AutoResetEvent ack = new AutoResetEvent(false);
+            Action<byte, byte[]> send = delegate (byte kind, byte[] data)
+            {
+                lock (wlock)
+                {
+                    byte[] head = new byte[5];
+                    head[0] = kind;
+                    BitConverter.GetBytes(data.Length).CopyTo(head, 1);
+                    s.Write(head, 0, 5);
+                    s.Write(data, 0, data.Length);
+                }
+            };
             try
             {
                 string name = parts.Length > 2 ? parts[2] : who;
                 Proto.WriteLine(s, "OK " + Environment.MachineName);
                 inj = StartInjector(name, who);
+                Injector injRef = inj;
+                RECT lastArea = new RECT();
+
+                // live picture for the app's viewer window: one frame per Ack, so it never backs up
+                Thread streamer = new Thread(delegate ()
+                {
+                    DateTime last = DateTime.MinValue;
+                    try
+                    {
+                        while (alive)
+                        {
+                            ack.WaitOne(1000);
+                            if (!alive) break;
+                            if (!streaming) continue;
+                            RECT ar = injRef.Area;
+                            if (ar.Width != lastArea.Width || ar.Height != lastArea.Height)
+                            {
+                                byte[] wh = new byte[8];
+                                BitConverter.GetBytes(ar.Width).CopyTo(wh, 0); BitConverter.GetBytes(ar.Height).CopyTo(wh, 4);
+                                send(Proto.MsgArea, wh); lastArea = ar;
+                            }
+                            double wait = 30 - (DateTime.UtcNow - last).TotalMilliseconds;   // up to ~30 fps on a LAN
+                            if (wait > 0) Thread.Sleep((int)wait);
+                            last = DateTime.UtcNow;
+                            byte[] jpg = WebPlayer.Frame(injRef, 1920, 70L);
+                            if (jpg != null) send(Proto.MsgFrame, jpg); else ack.Set();
+                        }
+                    }
+                    catch { alive = false; }
+                }) { IsBackground = true, Name = "app-stream" };
+                streamer.Start();
+
                 byte[] buf = new byte[Proto.PacketSize];
                 while (Proto.ReadExact(s, buf))
                 {
                     int a = BitConverter.ToInt32(buf, 1), b = BitConverter.ToInt32(buf, 5), cc = BitConverter.ToInt32(buf, 9);
-                    inj.Handle(buf[0], a, b, cc);
+                    switch (buf[0])
+                    {
+                        case Proto.Stream: streaming = a == 1; lastArea = new RECT(); ack.Set(); break;
+                        case Proto.Ack: ack.Set(); break;
+                        case Proto.Ping: if (a != 0) send(Proto.MsgPong, BitConverter.GetBytes(a)); break;
+                        default: inj.Handle(buf[0], a, b, cc); break;
+                    }
                 }
             }
             catch (Exception) { }
-            finally { EndSession(inj); }
+            finally { alive = false; ack.Set(); EndSession(inj); }
         }
     }
 }

@@ -54,8 +54,10 @@ namespace DuoSeat
     class ClientForm : Form
     {
         readonly TextBox txtHost = new TextBox(), txtPin = new TextBox();
-        readonly Button btnConnect = new Button(), btnFind = new Button(), btnCapture = new Button();
-        readonly Label lblStatus = new Label();
+        readonly Button btnConnect = new Button(), btnFind = new Button(), btnCapture = new Button(), btnLive = new Button();
+        readonly Label lblStatus = new Label(), lblLag = new Label();
+        ViewerForm viewer;
+        volatile IntPtr viewerHandle;
         readonly CaptureCurtain curtain = new CaptureCurtain();
         readonly System.Windows.Forms.Timer pingTimer = new System.Windows.Forms.Timer();
         readonly System.Windows.Forms.Timer retryTimer = new System.Windows.Forms.Timer();
@@ -89,19 +91,32 @@ namespace DuoSeat
             btnFind.Click += delegate { Find(); };
             Label l2 = new Label { Text = "PIN (shown on A):", Bounds = new Rectangle(14, 46, 130, 24), TextAlign = ContentAlignment.MiddleLeft };
             txtPin.Bounds = new Rectangle(146, 46, 80, 24);
-            btnConnect.Text = "Connect"; btnConnect.Bounds = new Rectangle(14, 84, 190, 32);
-            btnConnect.Click += delegate { if (connected || retrying) { retrying = false; retryTimer.Stop(); Disconnect("Disconnected."); } else Connect(); };
-            btnCapture.Text = "Take control  (Ctrl+Alt+X)"; btnCapture.Bounds = new Rectangle(214, 84, 192, 32);
+            btnConnect.Text = "Connect"; btnConnect.Bounds = new Rectangle(14, 84, 110, 32);
+            btnConnect.Click += delegate
+            {
+                if (connected || retrying)
+                {
+                    retrying = false; retryTimer.Stop();
+                    if (viewer != null) viewer.Close();
+                    Disconnect("Disconnected.");
+                }
+                else Connect();
+            };
+            btnCapture.Text = "Take control"; btnCapture.Bounds = new Rectangle(130, 84, 134, 32);
             btnCapture.Enabled = false;
             btnCapture.Click += delegate { SetCapture(true); };
-            lblStatus.Bounds = new Rectangle(14, 126, 392, 40);
+            btnLive.Text = "Live view"; btnLive.Bounds = new Rectangle(270, 84, 136, 32);
+            btnLive.Enabled = false;
+            btnLive.Click += delegate { OpenViewer(); };
+            lblStatus.Bounds = new Rectangle(14, 124, 392, 40);
             lblStatus.Text = "Both laptops must be on the same Wi-Fi / network.";
+            lblLag.Bounds = new Rectangle(306, 60, 100, 18); lblLag.TextAlign = ContentAlignment.MiddleRight; lblLag.ForeColor = Color.DimGray;
             Label help = new Label
             {
-                Text = "Ctrl+Alt+X   take over Player A's screen / come back\nCtrl+Alt+M   switch click mode (Shared / Borrow)\nCtrl+Alt+C   bring your cursor to the middle of its screen",
-                Bounds = new Rectangle(14, 172, 392, 66), ForeColor = Color.DimGray
+                Text = "Take control: look at A's TV, your mouse + keys drive the orange cursor.\nLive view: see A's screen (or the virtual one) right here.\nCtrl+Alt+X take over / come back   Ctrl+Alt+M click mode\nCtrl+Alt+C cursor to the middle",
+                Bounds = new Rectangle(14, 166, 392, 70), ForeColor = Color.DimGray
             };
-            Controls.AddRange(new Control[] { l1, txtHost, btnFind, l2, txtPin, btnConnect, btnCapture, lblStatus, help });
+            Controls.AddRange(new Control[] { l1, txtHost, btnFind, l2, txtPin, lblLag, btnConnect, btnCapture, btnLive, lblStatus, help });
             Aero.Dress(this, "Player B", "Your mouse and keyboard, on Player A's screen.", 0);
 
             retryTimer.Interval = 3000;
@@ -109,8 +124,8 @@ namespace DuoSeat
 
             try { string[] last = File.ReadAllLines(SettingsPath()); if (last.Length > 0) txtHost.Text = last[0]; } catch { }
 
-            pingTimer.Interval = 2000;
-            pingTimer.Tick += delegate { Send(Proto.Ping, 0, 0, 0); };
+            pingTimer.Interval = 1000;
+            pingTimer.Tick += delegate { Send(Proto.Ping, Environment.TickCount | 1, 0, 0); };
 
             mouseProc = MouseHook;
             keyProc = KeyHook;
@@ -121,6 +136,26 @@ namespace DuoSeat
             string d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DuoSeat");
             Directory.CreateDirectory(d);
             return Path.Combine(d, "client.txt");
+        }
+
+        bool autoLive;
+
+        // DuoSeat.exe --client --connect 192.168.0.10 --pin 1234 [--live]   (a desktop shortcut can do this)
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            string[] a = Environment.GetCommandLineArgs();
+            string host = null, pin = null;
+            for (int i = 1; i < a.Length; i++)
+            {
+                if (a[i] == "--connect" && i + 1 < a.Length) host = a[i + 1];
+                if (a[i] == "--pin" && i + 1 < a.Length) pin = a[i + 1];
+                if (a[i] == "--live") autoLive = true;
+            }
+            if (host == null) return;
+            txtHost.Text = host;
+            if (pin != null) txtPin.Text = pin;
+            Connect();
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -249,7 +284,29 @@ namespace DuoSeat
             sender.Start();
             Thread reader = new Thread(delegate ()
             {
-                try { byte[] b = new byte[64]; while (s.Read(b, 0, b.Length) > 0) { } } catch { }
+                // host -> app: [kind][int32 length][payload]
+                try
+                {
+                    byte[] head = new byte[5];
+                    while (Proto.ReadExact(s, head))
+                    {
+                        int len = BitConverter.ToInt32(head, 1);
+                        if (len < 0 || len > 32 * 1024 * 1024) break;
+                        byte[] data = new byte[len];
+                        if (len > 0 && !Proto.ReadExact(s, data)) break;
+                        if (head[0] == Proto.MsgFrame)
+                        {
+                            ViewerForm v = viewer;
+                            if (v != null) v.PushFrame(data); else Send(Proto.Stream, 0, 0, 0);
+                        }
+                        else if (head[0] == Proto.MsgPong && len >= 4)
+                        {
+                            int ms = Environment.TickCount - BitConverter.ToInt32(data, 0);
+                            if (ms >= 0 && ms < 60000) BeginInvoke((Action)delegate { lblLag.Text = "lag " + ms + " ms"; });
+                        }
+                    }
+                }
+                catch { }
                 if (connected) BeginInvoke((Action)delegate { LostConnection(); });
             }) { IsBackground = true };
             reader.Start();
@@ -260,7 +317,9 @@ namespace DuoSeat
             pingTimer.Start();
 
             btnConnect.Text = "Disconnect"; btnConnect.Enabled = true;
-            btnCapture.Enabled = true;
+            btnCapture.Enabled = true; btnLive.Enabled = true;
+            if (viewer != null) Send(Proto.Stream, 1, 0, 0);   // reconnected with the viewer open
+            else if (autoLive) { autoLive = false; OpenViewer(); }
             txtHost.Enabled = txtPin.Enabled = btnFind.Enabled = false;
             Status("Connected to " + name + ". Press Ctrl+Alt+X (or the button) to take control.");
         }
@@ -286,7 +345,8 @@ namespace DuoSeat
         void ResetButtons()
         {
             btnConnect.Text = "Connect"; btnConnect.Enabled = true;
-            btnCapture.Enabled = false;
+            btnCapture.Enabled = false; btnLive.Enabled = false;
+            lblLag.Text = "";
             txtHost.Enabled = txtPin.Enabled = btnFind.Enabled = true;
         }
 
@@ -301,7 +361,30 @@ namespace DuoSeat
             retryTimer.Start();
         }
 
-        void Send(byte type, int a, int b, int c)
+        // ------------------------------------------------------------------ live view window
+        void OpenViewer()
+        {
+            if (viewer != null) { viewer.Activate(); return; }
+            viewer = new ViewerForm(this);
+            viewer.FormClosed += delegate
+            {
+                viewer = null; viewerHandle = IntPtr.Zero;
+                Send(Proto.Stream, 0, 0, 0);
+            };
+            viewer.Show();
+            viewerHandle = viewer.Handle;
+            Send(Proto.Stream, 1, 0, 0);
+        }
+
+        public bool Capturing { get { return capturing; } }
+
+        bool ViewerActive()
+        {
+            IntPtr v = viewerHandle;
+            return v != IntPtr.Zero && W.GetForegroundWindow() == v;
+        }
+
+        internal void Send(byte type, int a, int b, int c)
         {
             BlockingCollection<byte[]> q = outQ;
             if (!connected || q == null || q.IsAddingCompleted) return;
@@ -404,7 +487,8 @@ namespace DuoSeat
             }
             if (up && swallowUp[vk]) { swallowUp[vk] = false; return new IntPtr(1); }
 
-            if (capturing)
+            // keys go to A's PC while taking control, or while the live view window is in front
+            if (capturing || ViewerActive())
             {
                 if (up && localKeys[vk]) { localKeys[vk] = false; return W.CallNextHookEx(keyHook, n, w, l); }
                 if (up && !sentKeys[vk]) return new IntPtr(1);

@@ -27,6 +27,13 @@ namespace DuoSeat
         public const byte Center = 8;   // put B cursor in middle of its area
         public const byte MoveAbs = 9;  // a,b = position inside B's area, 0..10000 (touch screens)
         public const byte Char = 10;    // a = unicode char, c = mods (1 Ctrl, 2 Alt, 4 Shift) (phone keyboards)
+        public const byte Stream = 11;  // a = 1 start / 0 stop the live picture
+        public const byte Ack = 12;     // client has shown a frame, send the next one
+
+        // host -> app messages: byte kind, int32 length, payload
+        public const byte MsgFrame = 1; // JPEG
+        public const byte MsgPong = 2;  // echoes the client's Ping value (for the lag readout)
+        public const byte MsgArea = 3;  // int32 width, int32 height of B's screen
 
         public const int PacketSize = 13;
 
@@ -115,6 +122,13 @@ namespace DuoSeat
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     public struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public uint dwFlags; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MONITORINFOEX
+    {
+        public int cbSize; public RECT rcMonitor, rcWork; public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
+    }
 
     public delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
     public delegate bool MonitorEnumProc(IntPtr hMon, IntPtr hdc, ref RECT r, IntPtr data);
@@ -208,6 +222,7 @@ namespace DuoSeat
         [DllImport("user32.dll", EntryPoint = "GetClassLongW")] public static extern uint GetClassLong32(IntPtr h, int i);
         [DllImport("user32.dll")] public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc fn, IntPtr data);
         [DllImport("user32.dll", CharSet = CharSet.Auto)] public static extern bool GetMonitorInfo(IntPtr hMon, ref MONITORINFO mi);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW")] public static extern bool GetMonitorInfoEx(IntPtr hMon, ref MONITORINFOEX mi);
         [DllImport("user32.dll")] public static extern bool PeekMessage(out System.Windows.Forms.Message m, IntPtr h, uint a, uint b, uint remove);
 
         // DPI
