@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101114">
+<title>DuoSeat - watching</title>
+<link rel="icon" href="/logo.png">
+<style>
+  :root { --a: #0078d7; --b: #ff8c00; --ok: #2b9d2b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #101114; color: #e8e8ea; font: 14px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  #scr { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; user-select: none; -webkit-user-drag: none; }
+  #bar { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+         background: rgba(20, 22, 27, .82); border: 1px solid rgba(255, 255, 255, .12); border-radius: 8px; backdrop-filter: blur(8px);
+         transition: opacity .4s; max-width: 560px; }
+  #bar.hide { opacity: 0; pointer-events: none; }
+  #bar img { width: 22px; height: 22px; }
+  #who { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #who b { font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #777; flex: none; }
+  .dot.live { background: #e23b3b; box-shadow: 0 0 0 0 rgba(226, 59, 59, .6); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(226, 59, 59, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 59, 59, 0); } }
+  #fs { background: none; border: 1px solid rgba(255, 255, 255, .25); color: inherit; border-radius: 5px; padding: 3px 9px; font: inherit; cursor: pointer; }
+  #fs:hover { background: rgba(255, 255, 255, .1); }
+  #msg { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+  #msg img { width: 56px; height: 56px; }
+  #msg h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  #msg p { margin: 0; color: #a9abb2; max-width: 380px; }
+  .legend { display: inline-flex; gap: 12px; font-size: 12.5px; color: #a9abb2; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+  @media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } #bar { transition: none; } }
+</style>
+</head>
+<body>
+<img id="scr" alt="Shared screen">
+<div id="msg"><img src="/logo.png" alt=""><h1 id="mt">Connecting...</h1><p id="mp">Hang on, finding the screen.</p></div>
+<div id="bar">
+  <img src="/logo.png" alt="">
+  <span class="dot" id="dot"></span>
+  <span id="who">DuoSeat</span>
+  <span class="legend"><span><i style="background:var(--a)"></i>A</span><span><i style="background:var(--b)"></i>B</span></span>
+  <button id="fs" type="button">Full screen</button>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const code = decodeURIComponent(location.hash.slice(1)).trim();
+  const img = $('scr'), bar = $('bar');
+  let ws, url = null, done = false, beat, tries = 0;
+
+  function say(title, text, dead) {
+    $('mt').textContent = title; $('mp').textContent = text;
+    $('msg').style.display = 'flex'; img.style.display = 'none';
+    $('dot').classList.remove('live');
+    if (dead) done = true;
+  }
+
+  function connect() {
+    if (!code) return say('No link code', 'This page needs the full watch link from DuoSeat, including the part after #.', true);
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    ws.binaryType = 'blob';
+    ws.onopen = () => { ws.send('v ' + code); clearInterval(beat); beat = setInterval(() => ws.readyState === 1 && ws.send('h'), 10000); };
+    ws.onmessage = e => {
+      if (typeof e.data === 'string') {
+        const [k, ...rest] = e.data.split(' ');
+        if (k === 'watch') { tries = 0; $('who').innerHTML = 'Watching <b></b>'; $('who').querySelector('b').textContent = rest.join(' ') || 'the screen'; $('mt').textContent = 'Waiting for the first picture...'; $('mp').textContent = ''; }
+        else if (k === 'bad') say('That link doesn\'t work', 'Sharing was restarted with a new link, or the link got cut off. Ask for a fresh one.', true);
+        else if (k === 'off') say('Sharing stopped', 'They stopped sharing their screen. You can close this tab.', true);
+        else if (k === 'full') say('Too many people watching', 'Try again in a bit.', true);
+        else if (k === 'locked') say('Too many wrong links', 'Wait a minute, then reload.', true);
+        return;
+      }
+      const next = URL.createObjectURL(e.data);
+      img.onload = () => { if (url) URL.revokeObjectURL(url); url = next; if (ws.readyState === 1) ws.send('f'); };
+      img.onerror = () => { URL.revokeObjectURL(next); if (ws.readyState === 1) ws.send('f'); };
+      img.src = next;
+      if (img.style.display !== 'block') { img.style.display = 'block'; $('msg').style.display = 'none'; $('dot').classList.add('live'); }
+    };
+    ws.onclose = () => {
+      clearInterval(beat);
+      if (done) return;
+      tries++;
+      say('Reconnecting...', tries > 3 ? 'Can\'t reach the PC. Is DuoSeat still open, and are you on the same Wi-Fi?' : 'Lost the connection for a second.');
+      setTimeout(connect, Math.min(1000 * tries, 5000));
+    };
+  }
+
+  // the bar fades away while you just watch, and comes back when you move
+  let idle;
+  function wake() { bar.classList.remove('hide'); clearTimeout(idle); idle = setTimeout(() => img.style.display === 'block' && bar.classList.add('hide'), 2500); }
+  ['pointermove', 'pointerdown', 'keydown'].forEach(ev => addEventListener(ev, wake));
+  wake();
+
+  $('fs').onclick = () => {
+    const d = document;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); }
+  };
+  addEventListener('dblclick', () => $('fs').click());
+  addEventListener('hashchange', () => location.reload());
+  connect();
+})();
+</script>
+</body>
+</html>

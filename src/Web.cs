@@ -18,18 +18,19 @@ namespace DuoSeat
 {
     static class WebPlayer
     {
-        static byte[] page;
+        static byte[] page, watchPage;
 
-        static byte[] Page()
+        static byte[] Page() { return page ?? (page = Resource("DuoSeat.index.html")); }
+        static byte[] WatchPage() { return watchPage ?? (watchPage = Resource("DuoSeat.watch.html")); }
+
+        static byte[] Resource(string name)
         {
-            if (page != null) return page;
-            using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("DuoSeat.index.html"))
+            using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
             using (MemoryStream m = new MemoryStream())
             {
                 if (s != null) s.CopyTo(m);
-                page = m.ToArray();
+                return m.ToArray();
             }
-            return page;
         }
 
         public static void Handle(HostForm host, TcpClient c, NetworkStream s, string requestLine)
@@ -52,6 +53,11 @@ namespace DuoSeat
             if (path == "/" || path.StartsWith("/?") || path == "/index.html")
             {
                 Respond(s, "200 OK", "text/html; charset=utf-8", Page());
+                return;
+            }
+            if (path == "/watch" || path.StartsWith("/watch?") || path == "/watch.html")
+            {
+                Respond(s, "200 OK", "text/html; charset=utf-8", WatchPage());
                 return;
             }
             if (path == "/logo.png")
@@ -152,6 +158,7 @@ namespace DuoSeat
                 // first message: "p <pin>"
                 if (!ReadFrame(s, out op, out data) || op != 1) return;
                 string hello = Encoding.UTF8.GetString(data);
+                if (hello.StartsWith("v ")) { Watch(host, c, conn, s, hello.Substring(2).Trim(), who); return; }
                 if (Guard.Locked || !hello.StartsWith("p ") || hello.Substring(2).Trim() != host.Pin)
                 {
                     bool wasLocked = Guard.Locked;
@@ -251,9 +258,110 @@ namespace DuoSeat
             return Capture(inj, jpegCodec, ep, maxWidth);
         }
 
+        // ------------------------------------------------------------------ screen share (view only)
+        // Anyone with the watch link sees the shared screen live. They can't click or type, and they
+        // don't take Player B's seat. One capture loop feeds every viewer, so ten viewers cost what one does.
+        const int MaxViewers = 25;
+        static readonly object shareLock = new object();
+        static byte[] shareFrame;
+        static int shareSeq, viewers;
+        static bool shareLoop;
+
+        public static int Viewers { get { lock (shareLock) return viewers; } }
+
+        static void Watch(HostForm host, TcpClient c, Conn conn, NetworkStream s, string code, string who)
+        {
+            string live = host.ShareCode;
+            if (live == null) { conn.Text("off"); Thread.Sleep(200); return; }
+            if (Guard.Locked || code != live)
+            {
+                if (!Guard.Locked) Guard.Failed();
+                conn.Text(Guard.Locked ? "locked" : "bad");
+                host.Log(Guard.Locked ? "Too many wrong links - locked for a minute." : "Wrong watch link from " + who);
+                Thread.Sleep(300); return;
+            }
+            lock (shareLock)
+            {
+                if (viewers >= MaxViewers) { conn.Text("full"); return; }
+                viewers++;
+                if (!shareLoop) { shareLoop = true; new Thread(delegate () { ShareLoop(host); }) { IsBackground = true, Name = "share" }.Start(); }
+            }
+            host.ViewersChanged();
+            try
+            {
+                conn.Text("watch " + Environment.MachineName);
+                Thread sender = new Thread(delegate ()
+                {
+                    int seen = -1;
+                    try
+                    {
+                        conn.Ack.Set();
+                        while (conn.Alive && host.ShareCode == code)
+                        {
+                            if (!conn.Ack.WaitOne(1000)) continue;        // viewer still busy with the last frame
+                            byte[] jpg = null;
+                            lock (shareLock)
+                            {
+                                while (shareSeq == seen && conn.Alive && host.ShareCode == code) Monitor.Wait(shareLock, 1000);
+                                if (shareSeq != seen) { jpg = shareFrame; seen = shareSeq; }
+                            }
+                            if (jpg != null) conn.Send(2, jpg); else conn.Ack.Set();
+                        }
+                        if (conn.Alive) { conn.Text("off"); conn.Send(8, new byte[0]); }
+                    }
+                    catch { }
+                    conn.Alive = false;
+                    try { c.Close(); } catch { }
+                }) { IsBackground = true, Name = "watch" };
+                sender.Start();
+
+                int op; byte[] data;
+                while (conn.Alive && ReadFrame(s, out op, out data))
+                {
+                    if (op == 8) { try { conn.Send(8, data ?? new byte[0]); } catch { } break; }
+                    if (op == 9) { conn.Send(10, data); continue; }
+                    if (op == 1 && data.Length > 0 && data[0] == (byte)'f') conn.Ack.Set();   // anything else ("h" heartbeat, clicks) is ignored
+                }
+            }
+            catch { }
+            finally
+            {
+                conn.Alive = false; conn.Ack.Set();
+                lock (shareLock) { viewers--; Monitor.PulseAll(shareLock); }
+                host.ViewersChanged();
+            }
+        }
+
+        static void ShareLoop(HostForm host)
+        {
+            if (jpegCodec == null)
+                foreach (ImageCodecInfo ci in ImageCodecInfo.GetImageEncoders()) if (ci.MimeType == "image/jpeg") jpegCodec = ci;
+            EncoderParameters ep = new EncoderParameters(1);
+            ep.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 62L);
+            try
+            {
+                while (true)
+                {
+                    lock (shareLock) if (viewers <= 0 || host.ShareCode == null) { shareLoop = false; shareFrame = null; return; }
+                    DateTime t0 = DateTime.UtcNow;
+                    byte[] jpg = null;
+                    try { jpg = Shot(host.ShareArea, host.Active, jpegCodec, ep, 1600); } catch { }
+                    if (jpg != null) lock (shareLock) { shareFrame = jpg; shareSeq++; Monitor.PulseAll(shareLock); }
+                    int wait = 83 - (int)(DateTime.UtcNow - t0).TotalMilliseconds;   // ~12 fps for everyone
+                    if (wait > 0) Thread.Sleep(wait);
+                }
+            }
+            catch { lock (shareLock) shareLoop = false; }
+        }
+
         static byte[] Capture(Injector inj, ImageCodecInfo jpeg, EncoderParameters ep, int maxWidth = 1600)
         {
-            RECT a = inj.Area;
+            return Shot(inj.Area, inj, jpeg, ep, maxWidth);
+        }
+
+        // One JPEG of any part of the desktop, with A's cursor (and B's, if B is in it) drawn on.
+        static byte[] Shot(RECT a, Injector inj, ImageCodecInfo jpeg, EncoderParameters ep, int maxWidth)
+        {
             if (a.Width <= 0 || a.Height <= 0) return null;
             double scale = Math.Min(1.0, (double)maxWidth / a.Width);
             int w = (int)(a.Width * scale), h = (int)(a.Height * scale);
@@ -275,8 +383,9 @@ namespace DuoSeat
                     POINT pa; W.GetCursorPos(out pa);
                     if (pa.X >= a.Left && pa.X < a.Right && pa.Y >= a.Top && pa.Y < a.Bottom)
                         Arrow(g, (float)((pa.X - a.Left) * scale), (float)((pa.Y - a.Top) * scale), Color.FromArgb(0, 120, 215), "A");
-                    Arrow(g, (float)((inj.BX - a.Left) * scale), (float)((inj.BY - a.Top) * scale),
-                        inj.BorrowMode ? Color.FromArgb(230, 40, 40) : Color.FromArgb(255, 140, 0), "B");
+                    if (inj != null && inj.BX >= a.Left && inj.BX < a.Right && inj.BY >= a.Top && inj.BY < a.Bottom)
+                        Arrow(g, (float)((inj.BX - a.Left) * scale), (float)((inj.BY - a.Top) * scale),
+                            inj.BorrowMode ? Color.FromArgb(230, 40, 40) : Color.FromArgb(255, 140, 0), "B");
                 }
                 using (MemoryStream m = new MemoryStream())
                 {

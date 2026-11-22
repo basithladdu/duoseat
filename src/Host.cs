@@ -93,7 +93,7 @@ namespace DuoSeat
 
     class MonitorItem
     {
-        public string Name; public RECT Rect; public bool Virtual;
+        public string Name; public RECT Rect; public bool Virtual, FollowB;
         public override string ToString() { return Name; }
     }
 
@@ -104,7 +104,12 @@ namespace DuoSeat
         readonly CheckBox chkFrame = new CheckBox(), chkClip = new CheckBox();
         ClipSwapper clipSwap;
         readonly Button btnVirtual = new Button(), btnNet = new Button();
-        readonly LinkLabel lnkNet = new LinkLabel();
+        readonly LinkLabel lnkNet = new LinkLabel(), lnkShare = new LinkLabel();
+        readonly Button btnShare = new Button();
+        readonly ComboBox cboShare = new ComboBox();
+        volatile string shareCode;
+        string shareUrl, firstIp;
+        RECT shareArea;
         Tunnel tunnel;
         bool busyExtra;
         readonly CursorOverlay cursor = new CursorOverlay();
@@ -123,7 +128,7 @@ namespace DuoSeat
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(440, 372);
+            ClientSize = new Size(440, 428);
 
             Label l1 = new Label { Text = "Player B connects with the DuoSeat app, or any phone/browser:", Bounds = new Rectangle(14, 10, 412, 20) };
             lblAddr.Bounds = new Rectangle(14, 30, 412, 40);
@@ -164,19 +169,27 @@ namespace DuoSeat
             btnNet.Click += delegate { NetClicked(); };
             Button btnAdmin = new Button { Text = IsAdmin() ? "Admin: on" : "Run as admin", Bounds = new Rectangle(290, 216, 136, 30), Enabled = !IsAdmin() };
             btnAdmin.Click += delegate { Elevate(); };
-            lnkNet.Bounds = new Rectangle(14, 252, 412, 22);
+            btnShare.Text = "Share screen"; btnShare.Bounds = new Rectangle(14, 252, 136, 30);
+            btnShare.Click += delegate { ShareClicked(); };
+            cboShare.Bounds = new Rectangle(154, 255, 272, 24);
+            cboShare.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboShare.SelectedIndexChanged += delegate { ApplyShareArea(); };
+            lnkShare.Bounds = new Rectangle(14, 288, 412, 22);
+            lnkShare.Font = new Font("Consolas", 9.5f, FontStyle.Bold);
+            lnkShare.LinkClicked += delegate { if (shareUrl != null) { try { Clipboard.SetText(shareUrl); lblStatus.Text = "Watch link copied. Anyone with it can watch, nobody can touch."; } catch { } } };
+            lnkNet.Bounds = new Rectangle(14, 312, 412, 22);
             lnkNet.Font = new Font("Consolas", 9.5f, FontStyle.Bold);
             lnkNet.LinkClicked += delegate { if (tunnel != null && tunnel.Link != null) { try { Clipboard.SetText(tunnel.Link); lblStatus.Text = "Link copied. Send it to Player B with the PIN."; } catch { } } };
 
-            lblStatus.Bounds = new Rectangle(14, 278, 412, 48);
+            lblStatus.Bounds = new Rectangle(14, 336, 412, 48);
             lblStatus.Text = "Waiting for Player B...";
             Label tip = new Label
             {
                 Text = "Tip: fewest surprises when A and B use different apps (say A on Chrome, B on Edge).",
-                Bounds = new Rectangle(14, 328, 412, 40), ForeColor = Color.DimGray
+                Bounds = new Rectangle(14, 384, 412, 40), ForeColor = Color.DimGray
             };
 
-            Controls.AddRange(new Control[] { l1, lblAddr, l2, lblPin, btnPin, l3, cboScreen, l4, cboMode, chkFrame, chkClip, btnVirtual, btnNet, btnAdmin, lnkNet, lblStatus, tip });
+            Controls.AddRange(new Control[] { l1, lblAddr, l2, lblPin, btnPin, l3, cboScreen, l4, cboMode, chkFrame, chkClip, btnVirtual, btnNet, btnAdmin, btnShare, cboShare, lnkShare, lnkNet, lblStatus, tip });
             Aero.Dress(this, "Player A", "Your cursor stays yours. Player B gets the orange one.", 0);
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
 
@@ -195,6 +208,7 @@ namespace DuoSeat
             cursor.Show(); cursor.Hide();
             frame.Show(); frame.Hide();
             StartServer();
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--share") > 0) ShareClicked();
         }
 
         bool hasVirtual;
@@ -236,6 +250,7 @@ namespace DuoSeat
                 tunnel.Stop(); tunnel = null;
                 btnNet.Text = "Internet link"; lnkNet.Text = "";
                 NewPin(4);
+                UpdateShareLink();
                 lblStatus.Text = "Internet link closed. Only this Wi-Fi can connect now.";
                 return;
             }
@@ -256,6 +271,7 @@ namespace DuoSeat
                         if (tunnel != me) return;
                         btnNet.Enabled = true;
                         lnkNet.Text = link + "   (click to copy)";
+                        UpdateShareLink();
                         lblStatus.Text = "Internet link is live. Send the link + PIN to Player B.";
                     });
                 },
@@ -266,6 +282,7 @@ namespace DuoSeat
                         if (tunnel != me) return;
                         me.Stop(); tunnel = null; btnNet.Enabled = true; btnNet.Text = "Internet link"; lnkNet.Text = "";
                         NewPin(4);
+                        UpdateShareLink();
                         lblStatus.Text = "Internet link failed: " + err;
                     });
                 });
@@ -358,6 +375,7 @@ namespace DuoSeat
                 foreach (UnicastIPAddressInformation ua in ni.GetIPProperties().UnicastAddresses)
                     if (ua.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(ua.Address.ToString());
             }
+            firstIp = ips.Count == 0 ? null : ips[0];
             lblAddr.Text = ips.Count == 0 ? "(no network - join the same Wi-Fi)"
                 : "App:     " + ips[0] + "  (or Find)\nBrowser: http://" + ips[0] + ":" + Proto.TcpPort;
         }
@@ -400,6 +418,79 @@ namespace DuoSeat
             }
             if (mons.Count > 1) cboScreen.Items.Add(new MonitorItem { Name = "All screens", Rect = all });
             cboScreen.SelectedIndex = pick;
+
+            string keepShare = cboShare.SelectedItem == null ? null : cboShare.SelectedItem.ToString();
+            cboShare.Items.Clear();
+            int sharePick = 0;
+            for (int i = 0; i < mons.Count; i++)
+            {
+                cboShare.Items.Add(new MonitorItem { Name = "Show: " + mons[i].Name, Rect = mons[i].Rect });
+                if (mons[i].Rect.Left == 0 && mons[i].Rect.Top == 0) sharePick = i;     // the main screen
+            }
+            if (mons.Count > 1) cboShare.Items.Add(new MonitorItem { Name = "Show: all screens", Rect = all });
+            cboShare.Items.Add(new MonitorItem { Name = "Show: whatever Player B sees", FollowB = true });
+            for (int i = 0; i < cboShare.Items.Count; i++) if (cboShare.Items[i].ToString() == keepShare) sharePick = i;
+            cboShare.SelectedIndex = sharePick;
+        }
+
+        void ApplyShareArea()
+        {
+            MonitorItem m = cboShare.SelectedItem as MonitorItem;
+            if (m == null) return;
+            followB = m.FollowB;
+            shareArea = m.Rect;
+        }
+        volatile bool followB;
+
+        public string ShareCode { get { return shareCode; } }
+        public RECT ShareArea { get { return followB ? area : shareArea; } }
+
+        // view-only screen share: a private link; viewers watch, nobody can touch
+        void ShareClicked()
+        {
+            if (shareCode != null)
+            {
+                shareCode = null;
+                btnShare.Text = "Share screen"; lnkShare.Text = ""; shareUrl = null;
+                Text = "DuoSeat - Player A";
+                lblStatus.Text = "Stopped sharing. Everyone watching was dropped.";
+                return;
+            }
+            const string abc = "abcdefghjkmnpqrstuvwxyz23456789";
+            byte[] rnd = new byte[10];
+            using (System.Security.Cryptography.RandomNumberGenerator rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(rnd);
+            StringBuilder code = new StringBuilder();
+            foreach (byte b in rnd) code.Append(abc[b % abc.Length]);
+            shareCode = code.ToString();
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 1; i < args.Length - 1; i++) if (args[i] == "--share-code") shareCode = args[i + 1];
+            btnShare.Text = "Stop sharing";
+            Text = "DuoSeat - Player A (sharing your screen)";
+            UpdateShareLink();
+            lblStatus.Text = "Sharing. Anyone with the link can watch in a browser. They can't click or type.";
+        }
+
+        void UpdateShareLink()
+        {
+            if (shareCode == null) return;
+            string root = tunnel != null && tunnel.Link != null ? tunnel.Link.TrimEnd('/')
+                        : firstIp != null ? "http://" + firstIp + ":" + Proto.TcpPort : null;
+            if (root == null) { shareUrl = null; lnkShare.Text = "(join a Wi-Fi first)"; return; }
+            shareUrl = root + "/watch#" + shareCode;
+            lnkShare.Text = shareUrl + "   (click to copy)";
+        }
+
+        // called from viewer threads
+        public void ViewersChanged()
+        {
+            if (!IsHandleCreated) return;
+            BeginInvoke((Action)delegate
+            {
+                if (shareCode == null) return;
+                int n = WebPlayer.Viewers;
+                btnShare.Text = n > 0 ? "Stop sharing (" + n + ")" : "Stop sharing";
+                lblStatus.Text = n == 0 ? "Sharing. Nobody's watching yet." : n == 1 ? "1 person is watching your screen." : n + " people are watching your screen.";
+            });
         }
 
         void ApplyArea()

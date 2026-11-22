@@ -31,6 +31,7 @@ DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both w
 - **Live view** (Player B's app): A's screen in a window on B's laptop. Mouse over it = your orange cursor over there. Keys go there while it's in front, even Alt+Tab. Up to ~30 fps on Wi-Fi.
 - **Virtual screen for B**: no TV? DuoSeat adds a real extra screen with no cable, using the open-source [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, official release, SHA-256 checked, one Windows permission prompt). B works on it through Live view. Same button removes it.
 - **Internet link**: B is in another city? One click opens a private `https://….trycloudflare.com` link through Cloudflare's free tunnel (their signed, official `cloudflared`). The PIN turns 8 digits, and 5 wrong guesses lock the door for a minute.
+- **Share screen**: anyone can *watch*, nobody can touch. One click gives you a private link (`http://192.168.0.106:47800/watch#…`, or the https one when the internet link is open). Up to 25 people watch live in any browser, both cursors drawn in. They don't take B's seat, and **Stop sharing** kicks everyone out. Pick what they see: your screen, the TV, all screens, or whatever B is looking at.
 - **Run as admin**: lets B use admin windows too (Task Manager, installers).
 - **Own clipboard for B** (beta): B's Ctrl+C / Ctrl+V use B's own clipboard, so you never paste each other's stuff.
 - **Plug a TV in mid-session**: B moves onto it by himself. Pull it out: B comes back to the laptop screen.
@@ -74,6 +75,7 @@ Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight
 - 🟡 **Same app for both** (you're both in Chrome): typing is fine; B's shortcuts borrow your keyboard state for about 40 ms. Different apps is the smoothest.
 - ✅ **Two real laptops:** B on his own laptop over home Wi-Fi, cursor on A's TV, typing while A typed.
 - ✅ **Also tested:** app Live view (click + type through it), internet link (page + live picture through Cloudflare, ~180 ms to first frame), own clipboard (A's stays A's).
+- ✅ **Share screen:** 3 browsers watching at ~11 fps each while Player B worked from a 4th, a wrong link turned away, Stop sharing dropped everyone.
 - 🟡 **Virtual screen:** the install path is new; the driver itself is widely used. Tell us if it misbehaves.
 - ❌ **Nope (Windows says no):** games that read raw input, the UAC prompt and the lock screen (Windows' secure desktop).
 - 🔒 PIN-protected, no accounts, no telemetry. On Wi-Fi it's not encrypted, so use your home Wi-Fi. The internet link is HTTPS end to end through Cloudflare.
