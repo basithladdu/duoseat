@@ -12,7 +12,7 @@ DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both w
 ## Setup (about a minute)
 
 1. Put `DuoSeat.exe` on both laptops. Same Wi-Fi.
-2. **Your laptop:** open it, then **I'm Player A**. Windows asks about the firewall, so click **Allow**.
+2. **Your laptop:** open it, then **I'm Player A**. Click **Yes** when Windows asks to let it make changes (that's admin, so B can use Task Manager and installers too), then **Allow** on the firewall question.
 3. **His laptop:** open it, then **I'm Player B**, then **Find**. Type the PIN shown on yours and hit **Connect**.
 4. He presses **Ctrl+Alt+X**. His mouse and keyboard now drive the orange cursor on your TV. Ctrl+Alt+X again gives them back to his laptop.
 
@@ -28,16 +28,18 @@ DuoSeat gives him **his own cursor and his own keyboard on your PC**. You both w
 
 ## The extras (all on Player A's window)
 
-- **Live view** (Player B's app): A's screen in a window on B's laptop. Mouse over it = your orange cursor over there. Keys go there while it's in front, even Alt+Tab. Up to ~30 fps on Wi-Fi.
+- **Live view** (Player B's app): A's screen in a window on B's laptop. Mouse over it = your orange cursor over there. Keys go there while it's in front, even Alt+Tab. Up to ~30 fps on Wi-Fi. **No TV?** Then B is on the same screen A is using, and Live view opens by itself: A works on the laptop, B watches and controls the same screen from his own laptop, each with their own cursor.
 - **Virtual screen for B**: no TV? DuoSeat adds a real extra screen with no cable, using the open-source [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) (MIT, official release, SHA-256 checked, one Windows permission prompt). B works on it through Live view. Same button removes it.
 - **Internet link**: B is in another city? One click opens a private `https://….trycloudflare.com` link through Cloudflare's free tunnel (their signed, official `cloudflared`). The PIN turns 8 digits, and 5 wrong guesses lock the door for a minute.
 - **Share screen**: anyone can *watch*, nobody can touch. One click gives you a private link (`http://192.168.0.106:47800/watch#…`, or the https one when the internet link is open). Up to 25 people watch live in any browser, both cursors drawn in. They don't take B's seat, and **Stop sharing** kicks everyone out. Pick what they see: your screen, the TV, all screens, or whatever B is looking at.
-- **Run as admin**: lets B use admin windows too (Task Manager, installers).
+- **Admin by default**: Player A starts as admin (one Windows prompt), so B can use admin windows too: Task Manager, installers, admin terminals. Click **Admin: on** to skip it next time.
 - **Own clipboard for B** (beta): B's Ctrl+C / Ctrl+V use B's own clipboard, so you never paste each other's stuff.
 - **Plug a TV in mid-session**: B moves onto it by himself. Pull it out: B comes back to the laptop screen.
 - **Lag readout** on B's window. On home Wi-Fi expect a few ms. A network cable between the laptops is the fastest; Bluetooth is slower than Wi-Fi.
 
-Shortcut for B: `DuoSeat.exe --connect 192.168.0.106 --pin 1234 --live` connects and opens Live view straight away.
+Shortcut for B: `DuoSeat.exe --connect 192.168.0.106 --pin 1234 --live` connects and opens Live view straight away. For A: `DuoSeat.exe --host --b-screen 2` puts B on the second screen in the list.
+
+> Both laptops need the same DuoSeat version (1.4 or newer). Older ones can't connect because they don't encrypt.
 
 ## No app? Use a browser (phone works)
 
@@ -65,20 +67,25 @@ Windows has exactly **one** cursor and **one** keyboard focus. So we don't fight
 - **`PostMessage`**: B's clicks, scrolls and keys go straight into the window under the orange cursor. The real mouse never moves.
 - **`AttachThreadInput` + `SetKeyboardState`**: B's Ctrl/Shift/Alt are lent to B's app only, so his Ctrl+C doesn't press your Ctrl.
 - **`WM_NCHITTEST`**: asks "is this a title bar, an edge or the X button?", then DuoSeat moves, resizes, minimizes or closes the window itself.
-- **Borrow mode**: the taskbar, Start, right-click menus and Store apps ignore posted input. For those, the real cursor hops over for a few milliseconds, clicks, hops back, and gives you your window back.
+- **UI Automation** (Windows' accessibility layer): the taskbar, Start, Settings and Store apps ignore posted clicks. So when B clicks a button, a tab, a menu item or a list item there, DuoSeat *presses* it through accessibility instead. Your cursor doesn't move at all.
+- **Borrow mode**: for what's left (right-click menus on the taskbar, dragging in Store apps, their text boxes), the real cursor hops over for a few milliseconds, clicks, hops back, and gives you your window back.
+- **Encryption, no accounts**: the PIN is never sent. Both sides run **SPAKE2** with it (a password handshake: someone listening on the Wi-Fi learns nothing, and a fake Player A or B gets one guess per try, which the lockout counts). Everything after that is **ChaCha20 + HMAC-SHA256** with a counter, so nothing can be read, changed or replayed. Browsers do the same in plain JS (`web/seal.js`), because browsers only offer their built-in crypto on https pages.
 
 ## Honest list
 
 - ✅ **Tested:** both typing at the same moment (A's 120+ keys and B's text, zero mix-ups), browsers (Edge), regular Windows text boxes, Shift/Ctrl+A/Tab/Enter/Backspace, dragging windows by the title bar, the browser Player B from a desktop browser (live view, clicks, typing, auto-reconnect).
 - ✅ **Phone gestures** (tested with simulated touch): tap, long-press right-click then picking from that menu, two-finger scroll, pinch zoom, Ctrl button + key, autocorrect rewriting a word, Pad slide + tap. A's cursor and active window stayed put the whole time. Not yet run on a physical phone; found a quirk? Open an issue.
-- 🟡 **Borrow blink:** taskbar, Start, context menus, Settings and Store apps. You'll see your cursor twitch for a few ms.
+- ✅ **No more twitch on Start / taskbar buttons:** B clicked Start on the TV's taskbar, Start opened there, and A's cursor didn't move once in 300 checks.
+- 🟡 **Borrow blink, what's left:** right-clicking the taskbar, dragging inside Store apps and typing into their text boxes still borrow your cursor for a few ms.
 - 🟡 **Same app for both** (you're both in Chrome): typing is fine; B's shortcuts borrow your keyboard state for about 40 ms. Different apps is the smoothest.
 - ✅ **Two real laptops:** B on his own laptop over home Wi-Fi, cursor on A's TV, typing while A typed.
 - ✅ **Also tested:** app Live view (click + type through it), internet link (page + live picture through Cloudflare, ~180 ms to first frame), own clipboard (A's stays A's).
 - ✅ **Share screen:** 3 browsers watching at ~11 fps each while Player B worked from a 4th, a wrong link turned away, Stop sharing dropped everyone.
+- ✅ **Encryption:** both typing at once over the encrypted link (A's 130 keys and B's text, zero mix-ups), Live view click + type, phone page ~13 fps, internet link (first picture in 0.7 s). Watching the wire: 461 pictures went out and none was a readable image, and the PIN and watch code never appeared. Wrong PINs get turned away in the app and the browser.
 - 🟡 **Virtual screen:** the install path is new; the driver itself is widely used. Tell us if it misbehaves.
 - ❌ **Nope (Windows says no):** games that read raw input, the UAC prompt and the lock screen (Windows' secure desktop).
-- 🔒 PIN-protected, no accounts, no telemetry. On Wi-Fi it's not encrypted, so use your home Wi-Fi. The internet link is HTTPS end to end through Cloudflare.
+- 🔒 **Encrypted everywhere** (Wi-Fi, phone, watch links, internet link), PIN-protected, 5 wrong tries locks it for a minute, no accounts, no telemetry. The internet link is also HTTPS through Cloudflare. Anyone holding a watch link can watch until you press **Stop sharing**.
+- 🟡 **Admin prompt:** Windows asks once each time Player A starts. Say no and DuoSeat still works, just not in admin windows.
 
 ## Build it yourself
 
@@ -98,6 +105,8 @@ That gives you `dist\DuoSeat.exe`.
 | `src/Client.cs` | Player B: hooks, capture, auto-reconnect |
 | `src/Web.cs` + `web/index.html` | Player B in a browser: tiny HTTP + WebSocket server, JPEG live view |
 | `src/Viewer.cs` | Player B's Live view window |
+| `src/Secure.cs` + `web/seal.js` | encryption: SPAKE2 PIN handshake, ChaCha20 + HMAC records |
+| `src/SmartClick.cs` | presses taskbar/Start/Store-app buttons through accessibility, no cursor twitch |
 | `src/Extras.cs` | virtual screen, internet link, signature checks, PIN lockout, own clipboard |
 | `src/Aero.cs` | the Windows 7 look |
 | `src/Common.cs` | protocol and Win32 imports |
@@ -105,6 +114,6 @@ That gives you `dist\DuoSeat.exe`.
 
 ## Next up
 
-3+ players, encryption, a Player B for Mac and Linux. PRs welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+3+ players, a Player B for Mac and Linux. PRs welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 MIT licensed. Do cool stuff with it.

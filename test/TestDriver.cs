@@ -14,7 +14,7 @@ namespace DuoSeat
         [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint type);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
 
-        static NetworkStream s;
+        static Stream s;
         static int x, y;
 
         static void P(byte t, int a, int b, int c) { byte[] p = Proto.Pack(t, a, b, c); s.Write(p, 0, p.Length); }
@@ -24,14 +24,25 @@ namespace DuoSeat
         {
             TcpClient c = new TcpClient(args[0], Proto.TcpPort);
             c.NoDelay = true;
-            s = c.GetStream();
-            Proto.WriteLine(s, Proto.Hello + " " + args[1] + " TestDriver");
+            NetworkStream ns = c.GetStream();
+            Spake.Party sp = new Spake.Party(false, "p", args[1]);
+            Proto.WriteLine(ns, Proto.Hello + " " + Spake.Hex(sp.Mine) + " TestDriver");
+            string[] yh = Proto.ReadLine(ns, 2048).Split(' ');
+            if (yh.Length < 3 || !sp.Finish(Spake.Unhex(yh[1])) || !Spake.Same(Spake.Unhex(yh[2]), sp.ConfirmA)) { Proto.WriteLine(ns, "C 00"); Console.WriteLine("handshake: wrong PIN (" + yh[0] + ")"); return 1; }
+            Proto.WriteLine(ns, "C " + Spake.Hex(sp.ConfirmB));
+            s = new SecureStream(ns, sp.MakeBox());
             string reply = Proto.ReadLine(s, 100);
             Console.WriteLine("handshake: " + reply);
             if (!reply.StartsWith("OK")) return 1;
             W.MakeDpiAware();
             x = int.Parse(args[2]); y = int.Parse(args[3]);
-            if (x < 0) { x = W.GetSystemMetrics(0) / 2; y = W.GetSystemMetrics(1) / 2; }
+            if (x < 0)
+            {
+                // the host starts B in the middle of B's screen: the extra monitor/TV if there is one
+                System.Drawing.Rectangle r = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
+                foreach (System.Windows.Forms.Screen sc in System.Windows.Forms.Screen.AllScreens) if (!sc.Primary) { r = sc.Bounds; break; }
+                x = r.Left + r.Width / 2; y = r.Top + r.Height / 2;
+            }
             P(Proto.Center, 0, 0, 0);
             foreach (string raw in File.ReadAllLines(args[4]))
             {

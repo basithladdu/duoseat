@@ -25,9 +25,12 @@ public static class T {
 [T]::SetProcessDPIAware() | Out-Null
 
 Get-Process DuoSeat, TestTarget -ErrorAction SilentlyContinue | Stop-Process -Force
-$host_ = Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--pin','1234' -PassThru
+$host_ = Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--pin','1234','--no-admin' -PassThru
 Start-Sleep -Seconds 2
-$b = Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetB',' 980','150','800','450' -PassThru
+# TargetB goes on B's screen: the TV if one is plugged in, otherwise the right half of the laptop screen
+$tv = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+$bx = if ($tv) { $tv.Bounds.X + 60 } else { 980 }
+$b = Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetB',"$bx",'150','800','450' -PassThru
 Start-Sleep -Milliseconds 800
 $a = Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetA','60','150','800','450' -PassThru
 Start-Sleep -Milliseconds 1500

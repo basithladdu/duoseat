@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -14,8 +15,27 @@ namespace DuoSeat
 {
     static class HostProgram
     {
+        // Admin is on by default: without it Player B can't touch Task Manager, installers or admin
+        // terminals (Windows only lets admin apps type into admin windows). One Windows prompt per start.
+        // "Admin: on" in the window turns that off for next time.
+        public static string AdminOffFile { get { return System.IO.Path.Combine(Folders.Data, "admin-off"); } }
+
         public static void Run()
         {
+            string[] args = Environment.GetCommandLineArgs();
+            if (!HostForm.IsAdmin() && Array.IndexOf(args, "--no-admin") < 0 && Array.IndexOf(args, "--elevated") < 0
+                && !System.IO.File.Exists(AdminOffFile))
+            {
+                StringBuilder rest = new StringBuilder("--host --elevated");
+                for (int i = 1; i < args.Length; i++) if (args[i] != "--host") rest.Append(" \"").Append(args[i]).Append('"');
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Application.ExecutablePath, rest.ToString())
+                    { Verb = "runas", UseShellExecute = true });
+                    return;
+                }
+                catch (System.ComponentModel.Win32Exception) { /* said no to the prompt: run normally */ }
+            }
             bool created;
             using (Mutex m = new Mutex(true, "DuoSeatHostSingleInstance", out created))
             {
@@ -167,8 +187,21 @@ namespace DuoSeat
             btnVirtual.Click += delegate { VirtualClicked(); };
             btnNet.Text = "Internet link"; btnNet.Bounds = new Rectangle(154, 216, 132, 30);
             btnNet.Click += delegate { NetClicked(); };
-            Button btnAdmin = new Button { Text = IsAdmin() ? "Admin: on" : "Run as admin", Bounds = new Rectangle(290, 216, 136, 30), Enabled = !IsAdmin() };
-            btnAdmin.Click += delegate { Elevate(); };
+            Button btnAdmin = new Button { Text = IsAdmin() ? "Admin: on" : "Run as admin", Bounds = new Rectangle(290, 216, 136, 30) };
+            btnAdmin.Click += delegate
+            {
+                if (!IsAdmin()) { try { System.IO.File.Delete(HostProgram.AdminOffFile); } catch { } Elevate(); return; }
+                bool off = System.IO.File.Exists(HostProgram.AdminOffFile);
+                try
+                {
+                    if (off) System.IO.File.Delete(HostProgram.AdminOffFile); else System.IO.File.WriteAllText(HostProgram.AdminOffFile, "1");
+                    btnAdmin.Text = off ? "Admin: on" : "Admin: off next time";
+                    lblStatus.Text = off ? "DuoSeat will start as admin again, so B can use Task Manager and installers."
+                                         : "Next start stays normal: B won't be able to use admin windows. Click again to undo.";
+                }
+                catch { }
+            };
+            if (IsAdmin() && System.IO.File.Exists(HostProgram.AdminOffFile)) btnAdmin.Text = "Admin: off next time";
             btnShare.Text = "Share screen"; btnShare.Bounds = new Rectangle(14, 252, 136, 30);
             btnShare.Click += delegate { ShareClicked(); };
             cboShare.Bounds = new Rectangle(154, 255, 272, 24);
@@ -194,6 +227,13 @@ namespace DuoSeat
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
 
             LoadMonitors();
+            // --b-screen 1 = the first screen in the list (the laptop), 2 = the next one...
+            string[] cl = Environment.GetCommandLineArgs();
+            for (int i = 1; i < cl.Length - 1; i++)
+            {
+                int n;
+                if (cl[i] == "--b-screen" && int.TryParse(cl[i + 1], out n) && n >= 1 && n <= cboScreen.Items.Count) cboScreen.SelectedIndex = n - 1;
+            }
             NewPin();
             ShowAddresses();
 
@@ -288,7 +328,7 @@ namespace DuoSeat
                 });
         }
 
-        static bool IsAdmin()
+        public static bool IsAdmin()
         {
             try { return new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator); }
             catch { return false; }
@@ -647,17 +687,34 @@ namespace DuoSeat
             return area;
         }
 
-        void Session(TcpClient c, NetworkStream s, string hello)
+        // "DUOSEAT2 <X> <name>" -> "Y <Y> <confirmA>" -> "C <confirmB>" -> everything after is sealed (Secure.cs)
+        void Session(TcpClient c, NetworkStream raw, string hello)
         {
             string who = ((IPEndPoint)c.Client.RemoteEndPoint).Address.ToString();
             string[] parts = hello.Split(new[] { ' ' }, 3);
-            if (parts.Length < 2 || parts[0] != Proto.Hello) return;
-            if (Guard.Locked || parts[1] != pin)
+            if (parts.Length < 2) return;
+            if (parts[0] == "DUOSEAT1")
             {
-                if (!Guard.Locked) Guard.Failed();
-                Proto.WriteLine(s, "BADPIN"); Status(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from " + who);
+                Proto.WriteLine(raw, "UPDATE");
+                Status("Player B's DuoSeat is too old (" + who + "). Get the new one on both laptops.");
+                return;
+            }
+            if (parts[0] != Proto.Hello) return;
+            if (Guard.Locked) { Proto.WriteLine(raw, "LOCKED"); Status("Too many wrong PINs - locked for a minute."); return; }
+            Spake.Party sp = new Spake.Party(true, "p", pin);
+            if (!sp.Finish(Spake.Unhex(parts[1]))) return;
+            Proto.WriteLine(raw, "Y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
+            string conf = null;
+            try { conf = Proto.ReadLine(raw, 200); } catch { }
+            if (conf == null || !conf.StartsWith("C ") || !Spake.Same(Spake.Unhex(conf.Substring(2)), sp.ConfirmB))
+            {
+                // a wrong PIN, or someone hanging up to test a guess: both count
+                Guard.Failed();
+                try { Proto.WriteLine(raw, "BADPIN"); } catch { }
+                Status(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from " + who);
                 Thread.Sleep(300); return;
             }
+            Stream s = new SecureStream(raw, sp.MakeBox());
             if (!TryBegin(c)) { Proto.WriteLine(s, "BUSY"); return; }
             Injector inj = null;
             object wlock = new object();
@@ -680,6 +737,10 @@ namespace DuoSeat
                 Proto.WriteLine(s, "OK " + Environment.MachineName);
                 inj = StartInjector(name, who);
                 Injector injRef = inj;
+                // no TV: B is on the same screen A is using, so B's app opens Live view to watch and control it
+                RECT ba = inj.Area; Point ac = Cursor.Position;
+                bool same = Screen.AllScreens.Length == 1 || (ac.X >= ba.Left && ac.X < ba.Right && ac.Y >= ba.Top && ac.Y < ba.Bottom);
+                send(Proto.MsgHint, new[] { (byte)(same ? 1 : 0) });
                 RECT lastArea = new RECT();
 
                 // live picture for the app's viewer window: one frame per Ack, so it never backs up

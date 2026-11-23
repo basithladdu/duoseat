@@ -31,5 +31,5 @@ function Grab($title, $file) {
 }
 Get-Process DuoSeat -ErrorAction SilentlyContinue | Stop-Process -Force
 $p = Start-Process "$root\dist\DuoSeat.exe" -PassThru; Grab 'DuoSeat' 'choose.png'; $p | Stop-Process
-$p = Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host' -PassThru; Grab 'DuoSeat - Player A' 'player-a.png'; $p | Stop-Process
+$p = Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host','--no-admin' -PassThru; Grab 'DuoSeat - Player A' 'player-a.png'; $p | Stop-Process
 $p = Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--client' -PassThru; Grab 'DuoSeat - Player B' 'player-b.png'; $p | Stop-Process

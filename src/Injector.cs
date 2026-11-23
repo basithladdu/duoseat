@@ -270,6 +270,19 @@ namespace DuoSeat
                     break;
                 case Drag.BorrowPending:
                     if (btn != heldButton) return;
+                    // a plain left click on a button: press it through accessibility, the real cursor never moves
+                    if (btn == 0 && !BorrowMode)
+                    {
+                        IntPtr fgBefore = W.GetForegroundWindow();
+                        if (SmartClick.TryPress(bx, by, myPid))
+                        {
+                            Pressed++;
+                            savedFg = fgBefore;
+                            Thread.Sleep(60);
+                            HandBackFocus();
+                            break;
+                        }
+                    }
                     BorrowSave();
                     SendMouse(bx, by, 0, 0);
                     SendMouse(bx, by, DownFlag(btn), XData(btn));
@@ -332,6 +345,14 @@ namespace DuoSeat
         {
             SendMouse(savedA.X, savedA.Y, 0, 0);
             Thread.Sleep(60);
+            Borrowed++;
+            HandBackFocus();
+        }
+
+        public int Pressed, Borrowed;      // counters for tests: no-twitch presses vs real-cursor borrows
+
+        void HandBackFocus()
+        {
             IntPtr fg = W.GetForegroundWindow();
             if (fg == savedFg || savedFg == IntPtr.Zero || !W.IsWindow(savedFg)) return;
             // keep a menu/popup B just opened, otherwise hand the active window back to A

@@ -11,6 +11,7 @@ public static class V {
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref POINT p);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, IntPtr e);
@@ -25,20 +26,28 @@ $N = [NullString]::Value
 function WaitWin($t) { for ($i = 0; $i -lt 60; $i++) { $h = [V]::FindWindow($N, $t); if ($h -ne [IntPtr]::Zero) { return $h }; Start-Sleep -Milliseconds 250 }; throw "no window $t" }
 
 Get-Process DuoSeat, TestTarget -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1
-Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host', '--pin', '1234' | Out-Null
+Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host', '--pin', '1234', '--no-admin' | Out-Null
 Start-Sleep -Seconds 2
-Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetB', '1300', '560', '560', '300', 'top' | Out-Null
+# B's screen: the TV / extra monitor if there is one, else the laptop screen (physical pixels, this script is DPI aware)
+$scr = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+if (-not $scr) { $scr = [System.Windows.Forms.Screen]::PrimaryScreen }
+$A = $scr.Bounds
+$tx = $A.X + [int]($A.Width * 0.35); $ty = $A.Y + [int]($A.Height * 0.3)
+Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetB', "$tx", "$ty", '560', '300', 'top' | Out-Null
 $hb = WaitWin 'TargetB'
 Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--connect', 'localhost', '--pin', '1234', '--live' | Out-Null
 $hv = WaitWin 'DuoSeat - live view (your cursor is the orange one)'
 [V]::SetWindowPos($hv, [IntPtr]::Zero, 20, 40, 1200, 720, 0x4) | Out-Null
 Start-Sleep -Seconds 3
 
-# where TargetB's text box (physical 1580,700) appears inside the viewer picture
+# where TargetB's text box (280,140 into the window) appears inside the viewer picture
 $cr = New-Object V+RECT; [V]::GetClientRect($hv, [ref]$cr) | Out-Null
-$s = [Math]::Min($cr.R / 1920.0, $cr.B / 1080.0); $fw = 1920 * $s; $fh = 1080 * $s
+$s = [Math]::Min($cr.R / $A.Width, $cr.B / $A.Height); $fw = $A.Width * $s; $fh = $A.Height * $s
 $fx = ($cr.R - $fw) / 2; $fy = ($cr.B - $fh) / 2
-$p = New-Object V+POINT; $p.X = [int]($fx + 1580 * $s); $p.Y = [int]($fy + 700 * $s)
+# the text box's real spot on B's screen (TestTarget may be DPI-scaled, so measure instead of guessing)
+$er = New-Object V+RECT; [V]::GetWindowRect([V]::GetWindow($hb, 5), [ref]$er) | Out-Null
+$ex = ($er.L + $er.R) / 2; $ey = ($er.T + $er.B) / 2
+$p = New-Object V+POINT; $p.X = [int]($fx + ($ex - $A.X) * $s); $p.Y = [int]($fy + ($ey - $A.Y) * $s)
 [V]::ClientToScreen($hv, [ref]$p) | Out-Null
 "click inside viewer at screen $($p.X),$($p.Y)"
 [V]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 200

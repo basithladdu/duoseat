@@ -81,7 +81,7 @@ namespace DuoSeat
         bool retrying, connecting;
 
         TcpClient tcp;
-        NetworkStream stream;
+        Stream stream;
         BlockingCollection<byte[]> outQ;
         volatile bool connected;
         volatile bool capturing;
@@ -260,9 +260,25 @@ namespace DuoSeat
                     if (!ar.AsyncWaitHandle.WaitOne(5000)) { c.Close(); throw new Exception("no answer (is DuoSeat open as Player A, and was it allowed through the Windows firewall?)"); }
                     c.EndConnect(ar);
                     c.NoDelay = true;
-                    NetworkStream s = c.GetStream();
-                    Proto.WriteLine(s, Proto.Hello + " " + pin + " " + Environment.MachineName);
-                    c.ReceiveTimeout = 5000;
+                    NetworkStream raw = c.GetStream();
+                    // encrypted from here on: the PIN never crosses the network (Secure.cs)
+                    Spake.Party sp = new Spake.Party(false, "p", pin);
+                    Proto.WriteLine(raw, Proto.Hello + " " + Spake.Hex(sp.Mine) + " " + Environment.MachineName);
+                    c.ReceiveTimeout = 8000;
+                    string first;
+                    try { first = Proto.ReadLine(raw, 2048); }
+                    catch (IOException) { c.Close(); throw new Exception("Player A hung up. If it's an older DuoSeat, get the new one on both laptops."); }
+                    if (first == "UPDATE" || first == "BADPIN") { c.Close(); throw new Exception("Player A has an older DuoSeat. Get the new one on both laptops."); }
+                    if (first == "LOCKED") { c.Close(); throw new Exception("too many wrong PINs, wait a minute"); }
+                    string[] yp = first.Split(' ');
+                    if (yp.Length < 3 || yp[0] != "Y") { c.Close(); throw new Exception("unexpected reply"); }
+                    if (!sp.Finish(Spake.Unhex(yp[1])) || !Spake.Same(Spake.Unhex(yp[2]), sp.ConfirmA))
+                    {
+                        try { Proto.WriteLine(raw, "C 00"); } catch { }
+                        c.Close(); throw new Exception("wrong PIN - check the PIN on Player A's screen");
+                    }
+                    Proto.WriteLine(raw, "C " + Spake.Hex(sp.ConfirmB));
+                    Stream s = new SecureStream(raw, sp.MakeBox());
                     string reply = Proto.ReadLine(s, 200);
                     if (reply == "BADPIN") { c.Close(); throw new Exception("wrong PIN - check the PIN on Player A's screen"); }
                     if (reply == "BUSY") { c.Close(); throw new Exception("another Player B is already connected"); }
@@ -286,7 +302,7 @@ namespace DuoSeat
             t.Start();
         }
 
-        void OnConnected(TcpClient c, NetworkStream s, string name, string host)
+        void OnConnected(TcpClient c, Stream s, string name, string host)
         {
             tcp = c; stream = s; connected = true; connecting = false;
             retrying = false; retryTimer.Stop();
@@ -316,6 +332,15 @@ namespace DuoSeat
                         {
                             ViewerForm v = viewer;
                             if (v != null) v.PushFrame(data); else Send(Proto.Stream, 0, 0, 0);
+                        }
+                        else if (head[0] == Proto.MsgHint && len >= 1 && data[0] == 1)
+                        {
+                            BeginInvoke((Action)delegate
+                            {
+                                if (viewer != null || !connected) return;
+                                OpenViewer();
+                                Status("You share Player A's screen, so here it is live. Move over it and click or type: you control it, A keeps their own cursor.");
+                            });
                         }
                         else if (head[0] == Proto.MsgPong && len >= 4)
                         {

@@ -42,6 +42,7 @@
   <span class="legend"><span><i style="background:var(--a)"></i>A</span><span><i style="background:var(--b)"></i>B</span></span>
   <button id="fs" type="button">Full screen</button>
 </div>
+<script src="/seal.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -58,32 +59,32 @@
 
   function connect() {
     if (!code) return say('No link code', 'This page needs the full watch link from DuoSeat, including the part after #.', true);
-    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
-    ws.binaryType = 'blob';
-    ws.onopen = () => { ws.send('v ' + code); clearInterval(beat); beat = setInterval(() => ws.readyState === 1 && ws.send('h'), 10000); };
-    ws.onmessage = e => {
-      if (typeof e.data === 'string') {
-        const [k, ...rest] = e.data.split(' ');
+    // encrypted with the code from the link; the code itself never goes over the network (seal.js)
+    ws = DuoSeal.connect('v', code, {
+      open() { clearInterval(beat); beat = setInterval(() => ws.readyState === 1 && ws.send('h'), 10000); },
+      text(t) {
+        const [k, ...rest] = t.split(' ');
         if (k === 'watch') { tries = 0; $('who').innerHTML = 'Watching <b></b>'; $('who').querySelector('b').textContent = rest.join(' ') || 'the screen'; $('mt').textContent = 'Waiting for the first picture...'; $('mp').textContent = ''; }
-        else if (k === 'bad') say('That link doesn\'t work', 'Sharing was restarted with a new link, or the link got cut off. Ask for a fresh one.', true);
+        else if (k === 'bad') say("That link doesn't work", 'Sharing was restarted with a new link, or the link got cut off. Ask for a fresh one.', true);
         else if (k === 'off') say('Sharing stopped', 'They stopped sharing their screen. You can close this tab.', true);
         else if (k === 'full') say('Too many people watching', 'Try again in a bit.', true);
         else if (k === 'locked') say('Too many wrong links', 'Wait a minute, then reload.', true);
-        return;
+      },
+      binary(bytes) {
+        const next = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+        img.onload = () => { if (url) URL.revokeObjectURL(url); url = next; if (ws.readyState === 1) ws.send('f'); };
+        img.onerror = () => { URL.revokeObjectURL(next); if (ws.readyState === 1) ws.send('f'); };
+        img.src = next;
+        if (img.style.display !== 'block') { img.style.display = 'block'; $('msg').style.display = 'none'; $('dot').classList.add('live'); }
+      },
+      close() {
+        clearInterval(beat);
+        if (done) return;
+        tries++;
+        say('Reconnecting...', tries > 3 ? "Can't reach the PC. Is DuoSeat still open, and are you on the same Wi-Fi?" : 'Lost the connection for a second.');
+        setTimeout(connect, Math.min(1000 * tries, 5000));
       }
-      const next = URL.createObjectURL(e.data);
-      img.onload = () => { if (url) URL.revokeObjectURL(url); url = next; if (ws.readyState === 1) ws.send('f'); };
-      img.onerror = () => { URL.revokeObjectURL(next); if (ws.readyState === 1) ws.send('f'); };
-      img.src = next;
-      if (img.style.display !== 'block') { img.style.display = 'block'; $('msg').style.display = 'none'; $('dot').classList.add('live'); }
-    };
-    ws.onclose = () => {
-      clearInterval(beat);
-      if (done) return;
-      tries++;
-      say('Reconnecting...', tries > 3 ? 'Can\'t reach the PC. Is DuoSeat still open, and are you on the same Wi-Fi?' : 'Lost the connection for a second.');
-      setTimeout(connect, Math.min(1000 * tries, 5000));
-    };
+    });
   }
 
   // the bar fades away while you just watch, and comes back when you move

@@ -24,7 +24,7 @@ $N = [NullString]::Value
 function Wait-Window($cls, $title) { for ($i = 0; $i -lt 60; $i++) { $h = [R]::FindWindow($cls, $title); if ($h -ne [IntPtr]::Zero) { return $h }; Start-Sleep -Milliseconds 250 }; throw "window not found: $cls $title" }
 
 Get-Process DuoSeat, TestTarget -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--pin','1234' | Out-Null
+Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--pin','1234','--no-admin' | Out-Null
 Start-Sleep -Seconds 2
 
 # Never point this at the user's own apps (Win11 Notepad, for one, reuses an open window).

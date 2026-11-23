@@ -38,29 +38,9 @@ $ok = $false
 for ($i = 0; $i -lt 20 -and -not $ok; $i++) { try { $pg = Invoke-WebRequest "$link/" -UseBasicParsing -TimeoutSec 15; $ok = $pg.Content -match 'Player B' } catch { Start-Sleep 3 } }
 "page over https: $ok"
 
-# 2) websocket over wss: PIN, then ask for the live picture
-function WsSend($ws, $t) { $b = [Text.Encoding]::UTF8.GetBytes($t); $ws.SendAsync((New-Object 'ArraySegment[byte]' -ArgumentList (, $b)), 'Text', $true, [Threading.CancellationToken]::None).Wait() }
-function WsRecv($ws) {
-  $buf = New-Object byte[] 2000000; $off = 0
-  do { $r = $ws.ReceiveAsync((New-Object 'ArraySegment[byte]' -ArgumentList $buf, $off, ($buf.Length - $off)), [Threading.CancellationToken]::None); $r.Wait(20000) | Out-Null; $off += $r.Result.Count } until ($r.Result.EndOfMessage)
-  return @{ type = $r.Result.MessageType; len = $off; text = [Text.Encoding]::UTF8.GetString($buf, 0, [Math]::Min($off, 200)) }
-}
-$ws = New-Object Net.WebSockets.ClientWebSocket
-$ws.ConnectAsync([Uri]($link.Replace('https://', 'wss://') + '/ws'), [Threading.CancellationToken]::None).Wait(20000) | Out-Null
-"websocket state: $($ws.State)"
-WsSend $ws ('p 00000000')            # wrong PIN first
-$m = WsRecv $ws; "wrong PIN answer: $($m.text)"
-$ws.Dispose()
-$ws = New-Object Net.WebSockets.ClientWebSocket
-$ws.ConnectAsync([Uri]($link.Replace('https://', 'wss://') + '/ws'), [Threading.CancellationToken]::None).Wait(20000) | Out-Null
-WsSend $ws ("p $pin")
-$m = WsRecv $ws; "right PIN answer: $($m.text)"
-$t0 = Get-Date
-WsSend $ws 's 1'
-$m = WsRecv $ws; "first live frame over the internet: $($m.type), $([int]($m.len/1KB)) KB, after $([int]((Get-Date) - $t0).TotalMilliseconds) ms"
-WsSend $ws 'f'
-$m = WsRecv $ws; "second frame: $($m.type), $([int]($m.len/1KB)) KB"
-$ws.CloseAsync('NormalClosure', 'bye', [Threading.CancellationToken]::None).Wait(5000) | Out-Null
+# 2) the real page over wss (encrypted on top of https): wrong PIN, then the right one and a live picture
+$py = Join-Path $PSScriptRoot 'internet-page.py'
+python $py $link $pin
 
 } finally {
   # close the link again, whatever happened

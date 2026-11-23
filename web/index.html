@@ -96,6 +96,7 @@
 </div>
 <textarea id="kb" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
 
+<script src="/seal.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -110,31 +111,31 @@ function say(t, sticky) {
   clearTimeout(say.t); if (!sticky) say.t = setTimeout(() => statusEl.style.opacity = 0, 2200);
 }
 function connect() {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
-  ws.binaryType = 'blob';
-  ws.onopen = () => send('p ' + pin);
-  ws.onmessage = e => {
-    if (typeof e.data !== 'string') {
-      const url = URL.createObjectURL(e.data);
+  // encrypted: the PIN never goes over the Wi-Fi, it only proves both sides know it (seal.js)
+  ws = DuoSeal.connect('p', pin, {
+    binary(bytes) {
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
       img.onload = () => { if (lastUrl) URL.revokeObjectURL(lastUrl); lastUrl = url; if (!fitW) layout(); send('f'); };
-      img.src = url; return;
+      img.src = url;
+    },
+    text(t) {
+      const p = t.split(' ');
+      if (p[0] === 'ok') {
+        W = +p[1]; H = +p[2]; alive = true;
+        try { localStorage.setItem('duoseat-pin', pin); } catch (_) {}
+        $('login').style.display = 'none'; $('app').style.display = 'flex';
+        fitW = 0; setMode(mode); say('Connected. Your cursor is the orange one.');
+      } else if (p[0] === 'bad') { $('err').textContent = "Wrong PIN. Check Player A's screen."; alive = false; ws.close(); }
+      else if (p[0] === 'busy') { $('err').textContent = 'Another Player B is already connected.'; alive = false; ws.close(); }
+      else if (p[0] === 'locked') { $('err').textContent = 'Too many wrong PINs. Wait a minute and try again.'; alive = false; ws.close(); }
+      else if (p[0] === 'mode') say(p[1] === '1' ? 'Borrow mode' : 'Shared mode');
+    },
+    close() {
+      if (!alive) return;
+      say('Lost Player A. Reconnecting...', true);
+      clearTimeout(retry); retry = setTimeout(connect, 2000);
     }
-    const p = e.data.split(' ');
-    if (p[0] === 'ok') {
-      W = +p[1]; H = +p[2]; alive = true;
-      try { localStorage.setItem('duoseat-pin', pin); } catch (_) {}
-      $('login').style.display = 'none'; $('app').style.display = 'flex';
-      fitW = 0; setMode(mode); say('Connected. Your cursor is the orange one.');
-    } else if (p[0] === 'bad') { $('err').textContent = 'Wrong PIN. Check Player A\'s screen.'; alive = false; ws.close(); }
-    else if (p[0] === 'busy') { $('err').textContent = 'Another Player B is already connected.'; alive = false; ws.close(); }
-    else if (p[0] === 'locked') { $('err').textContent = 'Too many wrong PINs. Wait a minute and try again.'; alive = false; ws.close(); }
-    else if (p[0] === 'mode') say(p[1] === '1' ? 'Borrow mode' : 'Shared mode');
-  };
-  ws.onclose = () => {
-    if (!alive) return;
-    say('Lost Player A. Reconnecting...', true);
-    clearTimeout(retry); retry = setTimeout(connect, 2000);
-  };
+  });
 }
 $('go').onclick = () => {
   pin = $('pin').value.trim(); if (!pin) return;

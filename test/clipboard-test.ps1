@@ -16,7 +16,7 @@ public static void SetText(IntPtr top, string s){ IntPtr e=GetWindow(top,5); Sen
 "@
 try {
   Get-Process DuoSeat, TestTarget -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1
-  Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host', '--pin', '1234', '--own-clipboard' | Out-Null
+  Start-Process "$root\dist\DuoSeat.exe" -ArgumentList '--host', '--pin', '1234', '--no-admin', '--own-clipboard' | Out-Null
   Start-Sleep 2
   Start-Process "$root\test\TestTarget.exe" -ArgumentList 'TargetB', '1300', '560', '560', '300', 'top' | Out-Null
   $hb = [IntPtr]::Zero; for ($i = 0; $i -lt 40 -and $hb -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 250; $hb = [C]::FindWindow([NullString]::Value, 'TargetB') }

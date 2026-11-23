@@ -14,7 +14,7 @@ namespace DuoSeat
     {
         public const int TcpPort = 47800;
         public const int UdpPort = 47801;
-        public const string Hello = "DUOSEAT1";
+        public const string Hello = "DUOSEAT2";      // v2 = encrypted (Secure.cs). "DUOSEAT1" was plain text.
         public const string DiscoverMsg = "DUOSEAT?";
 
         public const byte Move = 1;     // a=dx b=dy
@@ -34,6 +34,7 @@ namespace DuoSeat
         public const byte MsgFrame = 1; // JPEG
         public const byte MsgPong = 2;  // echoes the client's Ping value (for the lag readout)
         public const byte MsgArea = 3;  // int32 width, int32 height of B's screen
+        public const byte MsgHint = 4;  // byte 1 = B's screen is the one Player A is sitting at (no TV): watch it in Live view
 
         public const int PacketSize = 13;
 
@@ -47,13 +48,13 @@ namespace DuoSeat
             return p;
         }
 
-        public static void WriteLine(NetworkStream s, string line)
+        public static void WriteLine(Stream s, string line)
         {
             byte[] b = Encoding.UTF8.GetBytes(line + "\n");
             s.Write(b, 0, b.Length);
         }
 
-        public static string ReadLine(NetworkStream s, int max)
+        public static string ReadLine(Stream s, int max)
         {
             StringBuilder sb = new StringBuilder();
             while (sb.Length < max)
@@ -66,7 +67,7 @@ namespace DuoSeat
             return sb.ToString().Trim();
         }
 
-        public static bool ReadExact(NetworkStream s, byte[] buf)
+        public static bool ReadExact(Stream s, byte[] buf)
         {
             int got = 0;
             while (got < buf.Length)

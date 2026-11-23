@@ -22,6 +22,8 @@ namespace DuoSeat
 
         static byte[] Page() { return page ?? (page = Resource("DuoSeat.index.html")); }
         static byte[] WatchPage() { return watchPage ?? (watchPage = Resource("DuoSeat.watch.html")); }
+        static byte[] sealJs;
+        static byte[] Seal() { return sealJs ?? (sealJs = Resource("DuoSeat.seal.js")); }
 
         static byte[] Resource(string name)
         {
@@ -60,6 +62,11 @@ namespace DuoSeat
                 Respond(s, "200 OK", "text/html; charset=utf-8", WatchPage());
                 return;
             }
+            if (path == "/seal.js")
+            {
+                Respond(s, "200 OK", "text/javascript; charset=utf-8", Seal());
+                return;
+            }
             if (path == "/logo.png")
             {
                 Respond(s, "200 OK", "image/png", Logo());
@@ -96,6 +103,7 @@ namespace DuoSeat
         class Conn
         {
             public NetworkStream S;
+            public Box Box;          // set once the PIN/code handshake is done: then every message is sealed
             public readonly object WriteLock = new object();
             public volatile bool Alive = true, Streaming;
             public readonly AutoResetEvent Ack = new AutoResetEvent(false);
@@ -104,6 +112,13 @@ namespace DuoSeat
             {
                 lock (WriteLock)
                 {
+                    if (Box != null && (opcode == 1 || opcode == 2))
+                    {
+                        byte[] inner = new byte[data.Length + 1];
+                        inner[0] = opcode;
+                        Buffer.BlockCopy(data, 0, inner, 1, data.Length);
+                        data = Box.Seal(inner); opcode = 2;
+                    }
                     int n = data.Length;
                     byte[] head;
                     if (n < 126) head = new byte[] { (byte)(0x80 | opcode), (byte)n };
@@ -139,6 +154,45 @@ namespace DuoSeat
             return true;
         }
 
+        // Like ReadFrame, but once the connection is sealed it opens each message (null on tampering).
+        static bool ReadMsg(Conn conn, NetworkStream s, out int opcode, out byte[] payload)
+        {
+            while (true)
+            {
+                if (!ReadFrame(s, out opcode, out payload)) return false;
+                if (conn.Box == null || opcode >= 8) return true;
+                if (opcode != 2) continue;                       // unsealed text after the handshake: ignore
+                byte[] m = conn.Box.Open(payload);
+                if (m == null || m.Length < 1) return false;
+                opcode = m[0];
+                payload = new byte[m.Length - 1];
+                Buffer.BlockCopy(m, 1, payload, 0, payload.Length);
+                return true;
+            }
+        }
+
+        // "k p|v <X>" -> "y <Y> <confirmA>" -> "c <confirmB>". Returns false (and counts a failure) on a wrong secret.
+        static bool Handshake(HostForm host, Conn conn, NetworkStream s, string kind, string secret, string xHex, string who)
+        {
+            Spake.Party sp = new Spake.Party(true, kind, secret);
+            if (!sp.Finish(Spake.Unhex(xHex))) return false;
+            conn.Text("y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
+            int op; byte[] data;
+            string reply = null;
+            try { if (ReadFrame(s, out op, out data) && op == 1) reply = Encoding.UTF8.GetString(data); } catch { }
+            if (reply == null || !reply.StartsWith("c ") || !Spake.Same(Spake.Unhex(reply.Substring(2).Trim()), sp.ConfirmB))
+            {
+                Guard.Failed();
+                try { conn.Text(Guard.Locked ? "locked" : "bad"); } catch { }
+                host.Log(kind == "v" ? (Guard.Locked ? "Too many wrong links - locked for a minute." : "Wrong watch link from " + who)
+                                     : (Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from browser " + who));
+                Thread.Sleep(300);
+                return false;
+            }
+            conn.Box = sp.MakeBox();
+            return true;
+        }
+
         static void Socket(HostForm host, TcpClient c, NetworkStream s, string key)
         {
             string accept;
@@ -155,18 +209,20 @@ namespace DuoSeat
             try
             {
                 int op; byte[] data;
-                // first message: "p <pin>"
+                // first message: "k p <X>" (Player B with the PIN) or "k v <X>" (a viewer with the watch code)
                 if (!ReadFrame(s, out op, out data) || op != 1) return;
-                string hello = Encoding.UTF8.GetString(data);
-                if (hello.StartsWith("v ")) { Watch(host, c, conn, s, hello.Substring(2).Trim(), who); return; }
-                if (Guard.Locked || !hello.StartsWith("p ") || hello.Substring(2).Trim() != host.Pin)
+                string[] hello = Encoding.UTF8.GetString(data).Split(' ');
+                if (hello.Length < 3 || hello[0] != "k" || (hello[1] != "p" && hello[1] != "v")) { conn.Text("bad"); return; }
+                if (Guard.Locked) { conn.Text("locked"); return; }
+                if (hello[1] == "v")
                 {
-                    bool wasLocked = Guard.Locked;
-                    if (!wasLocked) Guard.Failed();
-                    conn.Text(Guard.Locked ? "locked" : "bad");
-                    host.Log(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from browser " + who);
-                    Thread.Sleep(300); return;
+                    string live = host.ShareCode;
+                    if (live == null) { conn.Text("off"); Thread.Sleep(200); return; }
+                    if (!Handshake(host, conn, s, "v", live, hello[2], who)) return;
+                    Watch(host, c, conn, s, live, who);
+                    return;
                 }
+                if (!Handshake(host, conn, s, "p", host.Pin, hello[2], who)) return;
                 if (!host.TryBegin(c)) { conn.Text("busy"); return; }
                 began = true;
                 inj = host.StartInjector("browser", who);
@@ -177,7 +233,7 @@ namespace DuoSeat
                 Thread streamer = new Thread(delegate () { Stream(conn, injRef); }) { IsBackground = true, Name = "stream" };
                 streamer.Start();
 
-                while (ReadFrame(s, out op, out data))
+                while (ReadMsg(conn, s, out op, out data))
                 {
                     if (op == 8) { try { conn.Send(8, data ?? new byte[0]); } catch { } break; }   // close: answer it
                     if (op == 9) { conn.Send(10, data); continue; }     // ping -> pong
@@ -271,15 +327,7 @@ namespace DuoSeat
 
         static void Watch(HostForm host, TcpClient c, Conn conn, NetworkStream s, string code, string who)
         {
-            string live = host.ShareCode;
-            if (live == null) { conn.Text("off"); Thread.Sleep(200); return; }
-            if (Guard.Locked || code != live)
-            {
-                if (!Guard.Locked) Guard.Failed();
-                conn.Text(Guard.Locked ? "locked" : "bad");
-                host.Log(Guard.Locked ? "Too many wrong links - locked for a minute." : "Wrong watch link from " + who);
-                Thread.Sleep(300); return;
-            }
+            // the code was already proven by the handshake
             lock (shareLock)
             {
                 if (viewers >= MaxViewers) { conn.Text("full"); return; }
@@ -316,7 +364,7 @@ namespace DuoSeat
                 sender.Start();
 
                 int op; byte[] data;
-                while (conn.Alive && ReadFrame(s, out op, out data))
+                while (conn.Alive && ReadMsg(conn, s, out op, out data))
                 {
                     if (op == 8) { try { conn.Send(8, data ?? new byte[0]); } catch { } break; }
                     if (op == 9) { conn.Send(10, data); continue; }
