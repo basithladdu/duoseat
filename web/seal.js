@@ -175,7 +175,7 @@
           h.open && h.open();
           return;
         }
-        h.text && h.text(e.data);
+        if (/^(bad|locked|off|busy|full)$/.test(e.data)) h.text && h.text(e.data);   // anything else unsealed is ignored
         return;
       }
       if (typeof e.data === 'string') return;            // plain text after the handshake is not from Player A

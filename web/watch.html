@@ -68,7 +68,7 @@
         else if (k === 'bad') say("That link doesn't work", 'Sharing was restarted with a new link, or the link got cut off. Ask for a fresh one.', true);
         else if (k === 'off') say('Sharing stopped', 'They stopped sharing their screen. You can close this tab.', true);
         else if (k === 'full') say('Too many people watching', 'Try again in a bit.', true);
-        else if (k === 'locked') say('Too many wrong links', 'Wait a minute, then reload.', true);
+        else if (k === 'locked') say('Too many wrong tries', 'Wait a few minutes, then reload.', true);
       },
       binary(bytes) {
         const next = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));

@@ -700,18 +700,29 @@ namespace DuoSeat
                 return;
             }
             if (parts[0] != Proto.Hello) return;
-            if (Guard.Locked) { Proto.WriteLine(raw, "LOCKED"); Status("Too many wrong PINs - locked for a minute."); return; }
-            Spake.Party sp = new Spake.Party(true, "p", pin);
-            if (!sp.Finish(Spake.Unhex(parts[1]))) return;
-            Proto.WriteLine(raw, "Y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
-            string conf = null;
-            try { conf = Proto.ReadLine(raw, 200); } catch { }
-            if (conf == null || !conf.StartsWith("C ") || !Spake.Same(Spake.Unhex(conf.Substring(2)), sp.ConfirmB))
+            if (!Guard.TryBegin()) { Proto.WriteLine(raw, "LOCKED"); Status(Guard.Message); return; }
+            // counted as a wrong try unless B proves the PIN (hanging up to test a guess counts too)
+            Spake.Party sp = null;
+            bool good = false;
+            try
             {
-                // a wrong PIN, or someone hanging up to test a guess: both count
-                Guard.Failed();
+                sp = new Spake.Party(true, "p", pin);
+                if (sp.Finish(Spake.Unhex(parts[1])))
+                {
+                    Proto.WriteLine(raw, "Y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
+                    string conf = null;
+                    int wait = raw.ReadTimeout;
+                    raw.ReadTimeout = 5000;
+                    try { conf = Proto.ReadLine(raw, 200); } catch { }
+                    try { raw.ReadTimeout = wait; } catch { }
+                    good = conf != null && conf.StartsWith("C ") && Spake.Same(Spake.Unhex(conf.Substring(2)), sp.ConfirmB);
+                }
+            }
+            finally { if (good) Guard.Passed(); else Guard.Failed(); }
+            if (!good)
+            {
                 try { Proto.WriteLine(raw, "BADPIN"); } catch { }
-                Status(Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from " + who);
+                Status(Guard.Locked ? Guard.Message : "Wrong PIN from " + who);
                 Thread.Sleep(300); return;
             }
             Stream s = new SecureStream(raw, sp.MakeBox());

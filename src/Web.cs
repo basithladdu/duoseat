@@ -174,18 +174,29 @@ namespace DuoSeat
         // "k p|v <X>" -> "y <Y> <confirmA>" -> "c <confirmB>". Returns false (and counts a failure) on a wrong secret.
         static bool Handshake(HostForm host, Conn conn, NetworkStream s, string kind, string secret, string xHex, string who)
         {
-            Spake.Party sp = new Spake.Party(true, kind, secret);
-            if (!sp.Finish(Spake.Unhex(xHex))) return false;
-            conn.Text("y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
-            int op; byte[] data;
-            string reply = null;
-            try { if (ReadFrame(s, out op, out data) && op == 1) reply = Encoding.UTF8.GetString(data); } catch { }
-            if (reply == null || !reply.StartsWith("c ") || !Spake.Same(Spake.Unhex(reply.Substring(2).Trim()), sp.ConfirmB))
+            if (!Guard.TryBegin()) { conn.Text("locked"); host.Log(Guard.Message); return false; }
+            // counted as a wrong try unless the browser proves the secret
+            Spake.Party sp = null;
+            bool good = false;
+            try
             {
-                Guard.Failed();
+                sp = new Spake.Party(true, kind, secret);
+                if (sp.Finish(Spake.Unhex(xHex)))
+                {
+                    conn.Text("y " + Spake.Hex(sp.Mine) + " " + Spake.Hex(sp.ConfirmA));
+                    int op; byte[] data;
+                    string reply = null;
+                    s.ReadTimeout = 5000;
+                    try { if (ReadFrame(s, out op, out data) && op == 1) reply = Encoding.UTF8.GetString(data); } catch { }
+                    try { s.ReadTimeout = 30000; } catch { }
+                    good = reply != null && reply.StartsWith("c ") && Spake.Same(Spake.Unhex(reply.Substring(2).Trim()), sp.ConfirmB);
+                }
+            }
+            finally { if (good) Guard.Passed(); else Guard.Failed(); }
+            if (!good)
+            {
                 try { conn.Text(Guard.Locked ? "locked" : "bad"); } catch { }
-                host.Log(kind == "v" ? (Guard.Locked ? "Too many wrong links - locked for a minute." : "Wrong watch link from " + who)
-                                     : (Guard.Locked ? "Too many wrong PINs - locked for a minute." : "Wrong PIN from browser " + who));
+                host.Log(Guard.Locked ? Guard.Message : (kind == "v" ? "Wrong watch link from " : "Wrong PIN from browser ") + who);
                 Thread.Sleep(300);
                 return false;
             }
@@ -213,7 +224,6 @@ namespace DuoSeat
                 if (!ReadFrame(s, out op, out data) || op != 1) return;
                 string[] hello = Encoding.UTF8.GetString(data).Split(' ');
                 if (hello.Length < 3 || hello[0] != "k" || (hello[1] != "p" && hello[1] != "v")) { conn.Text("bad"); return; }
-                if (Guard.Locked) { conn.Text("locked"); return; }
                 if (hello[1] == "v")
                 {
                     string live = host.ShareCode;

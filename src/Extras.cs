@@ -326,23 +326,64 @@ namespace DuoSeat
         }
     }
 
-    // Too many wrong PINs (someone guessing through the internet link): lock the door for a minute.
+    // Too many wrong PINs or links: lock the door. Every handshake counts as a wrong try the moment it
+    // starts and a right PIN takes it back, so opening lots of connections at once can't test more than
+    // 5 guesses. Each lockout is twice as long as the one before (1, 2, 4 ... 60 minutes) until someone gets in.
     static class Guard
     {
+        public const int Tries = 5;
         static readonly Queue<DateTime> fails = new Queue<DateTime>();
+        static int pending, lockouts;
         static DateTime lockedUntil = DateTime.MinValue;
         static readonly object l = new object();
 
         public static bool Locked { get { lock (l) return DateTime.UtcNow < lockedUntil; } }
 
-        public static void Failed()
+        public static string Message
+        {
+            get
+            {
+                lock (l)
+                {
+                    int min = (int)Math.Ceiling((lockedUntil - DateTime.UtcNow).TotalMinutes);
+                    return min > 0 ? "Too many wrong tries - locked for " + min + " min." : "Too many tries at once - wait a moment.";
+                }
+            }
+        }
+
+        static void Trim(DateTime now) { while (fails.Count > 0 && (now - fails.Peek()).TotalSeconds > 60) fails.Dequeue(); }
+
+        // before the handshake: false = locked, or too many tries already in flight
+        public static bool TryBegin()
         {
             lock (l)
             {
                 DateTime now = DateTime.UtcNow;
+                if (now < lockedUntil) return false;
+                Trim(now);
+                if (fails.Count + pending >= Tries) return false;
+                pending++;
+                return true;
+            }
+        }
+
+        // every TryBegin ends in exactly one of these two
+        public static void Passed() { lock (l) { if (pending > 0) pending--; lockouts = 0; } }
+
+        public static void Failed()
+        {
+            lock (l)
+            {
+                if (pending > 0) pending--;
+                DateTime now = DateTime.UtcNow;
                 fails.Enqueue(now);
-                while (fails.Count > 0 && (now - fails.Peek()).TotalSeconds > 60) fails.Dequeue();
-                if (fails.Count >= 5) { lockedUntil = now.AddSeconds(60); fails.Clear(); }
+                Trim(now);
+                if (fails.Count >= Tries)
+                {
+                    lockedUntil = now.AddMinutes(Math.Min(60, 1 << Math.Min(lockouts, 6)));
+                    lockouts++;
+                    fails.Clear();
+                }
             }
         }
     }

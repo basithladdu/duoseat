@@ -2,7 +2,7 @@
 //
 // Key exchange: SPAKE2 in the 2048-bit MODP group (RFC 3526 #14), with the PIN (or the watch code) as
 // the password. Someone listening on the Wi-Fi learns nothing, and someone who fakes either side gets
-// exactly one PIN guess per try, which the PIN lockout counts. The PIN itself never crosses the network.
+// exactly one PIN guess per try against Player A, which the lockout counts (Guard, Extras.cs). The PIN itself never crosses the network.
 // Records: ChaCha20 (RFC 8439) + HMAC-SHA256 (16-byte tag) over a per-direction sequence number,
 // so nothing can be read, changed, replayed or reordered. web/seal.js is the same thing for browsers.
 using System;
@@ -37,11 +37,30 @@ namespace DuoSeat
             return h * h % P;
         }
 
+        // N^w / M^w and their inverses depend only on the PIN, so work them out once per PIN. Then each
+        // connection only does exponentiations with fresh random exponents, and timing it says nothing about the PIN.
+        static readonly System.Collections.Generic.Dictionary<string, BigInteger[]> masks = new System.Collections.Generic.Dictionary<string, BigInteger[]>();
+
+        static BigInteger[] Masks(bool host, byte[] pwHash, BigInteger w)
+        {
+            string key = (host ? "h" : "c") + Hex(pwHash);
+            lock (masks)
+            {
+                BigInteger[] m;
+                if (masks.TryGetValue(key, out m)) return m;
+                if (masks.Count > 16) masks.Clear();
+                m = new[] { BigInteger.ModPow(host ? N : M, w, P), BigInteger.ModPow(host ? M : N, Q - w, P) };
+                masks[key] = m;
+                return m;
+            }
+        }
+
         public class Party
         {
             readonly bool host;
             readonly BigInteger w, secretExp;
             readonly byte[] pwHash;
+            readonly BigInteger unmask;           // (M or N)^-w, for the other side's number
             public readonly byte[] Mine;      // X (from Player B) or Y (from Player A), 256 bytes
             byte[] transcript;
 
@@ -55,7 +74,9 @@ namespace DuoSeat
                 using (RandomNumberGenerator rng = RandomNumberGenerator.Create()) rng.GetBytes(r);
                 secretExp = FromBE(r) % Q;
                 if (secretExp.IsZero) secretExp = 1;
-                BigInteger mine = BigInteger.ModPow(G, secretExp, P) * BigInteger.ModPow(host ? N : M, w, P) % P;
+                BigInteger[] m = Masks(host, pwHash, w);
+                unmask = m[1];
+                BigInteger mine = BigInteger.ModPow(G, secretExp, P) * m[0] % P;
                 Mine = ToBE(mine);
             }
 
@@ -65,7 +86,6 @@ namespace DuoSeat
                 if (theirs == null || theirs.Length != 256) return false;
                 BigInteger t = FromBE(theirs);
                 if (t <= 1 || t >= P - 1) return false;
-                BigInteger unmask = BigInteger.ModPow(host ? M : N, Q - w, P);          // (M or N)^-w
                 BigInteger k = BigInteger.ModPow(t * unmask % P, secretExp * 2, P);    // x2 drops any order-2 part
                 if (k <= 1) return false;
                 byte[] x = host ? theirs : Mine, y = host ? Mine : theirs;

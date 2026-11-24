@@ -269,7 +269,7 @@ namespace DuoSeat
                     try { first = Proto.ReadLine(raw, 2048); }
                     catch (IOException) { c.Close(); throw new Exception("Player A hung up. If it's an older DuoSeat, get the new one on both laptops."); }
                     if (first == "UPDATE" || first == "BADPIN") { c.Close(); throw new Exception("Player A has an older DuoSeat. Get the new one on both laptops."); }
-                    if (first == "LOCKED") { c.Close(); throw new Exception("too many wrong PINs, wait a minute"); }
+                    if (first == "LOCKED") { c.Close(); throw new Exception("too many wrong tries on Player A - wait a few minutes"); }
                     string[] yp = first.Split(' ');
                     if (yp.Length < 3 || yp[0] != "Y") { c.Close(); throw new Exception("unexpected reply"); }
                     if (!sp.Finish(Spake.Unhex(yp[1])) || !Spake.Same(Spake.Unhex(yp[2]), sp.ConfirmA))

@@ -127,7 +127,7 @@ function connect() {
         fitW = 0; setMode(mode); say('Connected. Your cursor is the orange one.');
       } else if (p[0] === 'bad') { $('err').textContent = "Wrong PIN. Check Player A's screen."; alive = false; ws.close(); }
       else if (p[0] === 'busy') { $('err').textContent = 'Another Player B is already connected.'; alive = false; ws.close(); }
-      else if (p[0] === 'locked') { $('err').textContent = 'Too many wrong PINs. Wait a minute and try again.'; alive = false; ws.close(); }
+      else if (p[0] === 'locked') { $('err').textContent = 'Too many wrong tries. Wait a few minutes and try again.'; alive = false; ws.close(); }
       else if (p[0] === 'mode') say(p[1] === '1' ? 'Borrow mode' : 'Shared mode');
     },
     close() {
